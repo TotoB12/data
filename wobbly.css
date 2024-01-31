@@ -1,0 +1,52 @@
+@font-face {
+  font-family: "Geist Sans";
+  src: url("https://assets.codepen.io/605876/GeistVF.ttf") format("truetype");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Geist Sans", sans-serif;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: hsl(0 0% 6%);
+}
+
+h7 {
+  font-weight: 140;
+  letter-spacing: -0.05ch;
+  font-size: clamp(4rem, 12vw + 2rem, 16rem);
+  background: linear-gradient(#00b050, hsl(0 0% 50%));
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1px hsl(0 0% 90%);
+  margin: 0;
+  line-height: 1;
+}
+
+@media(prefers-reduced-motion: no-preference) {
+  h7 {
+    animation: scribble infinite 0.2s;
+  }
+}
+
+@keyframes scribble {
+  0% {
+    filter: url("#scribble--0");
+  }
+  25% {
+    filter: url("#scribble--1");
+  }
+  50% {
+    filter: url("#scribble--2");
+  }
+  75% {
+    filter: url("#scribble--3");
+  }
+  100% {
+    filter: url("#scribble--4");
+  }
+}
