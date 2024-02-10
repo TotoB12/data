@@ -13,7 +13,7 @@
     var totalDownloaded = 0; // in bytes
     var lastUpdateTime = 0;
     var lastUpdateSize = 0;
-    var parallelDownloads = 5; // Number of parallel downloads
+    var parallelDownloads = 20; // Number of parallel downloads
     var retryAttempts = 3; // Number of retry attempts for a failed download
     var chunkSize = 1024 * 1024 * 5; // 5MB chunks
 
@@ -62,7 +62,8 @@
     async function downloadFile() {
       if (!keepDownloading) return;
 
-      const fileUrl = 'https://huggingface.co/datasets/TotoB12/temp/resolve/main/The%20Office%20(US)%20%20-%20Pilot%20-%20S01E01.mp4?download=true';
+      // const fileUrl = 'https://huggingface.co/datasets/TotoB12/temp/resolve/main/The%20Office%20(US)%20%20-%20Pilot%20-%20S01E01.mp4?download=true';
+      const fileUrl = 'https://raw.githubusercontent.com/TotoB12/snl/main/Cars%204%20-%20SNL.mp4'
       let startByte = 0;
 
       while (keepDownloading) {
