@@ -10,27 +10,31 @@
   <script type="text/javascript" src="script.js"></script>
   <script>
     var keepDownloading = false;
-    var totalDownloaded = 0; // in bytes
-    var lastUpdateTime = 0;
-    var lastUpdateSize = 0;
-    var parallelDownloads = 20; // Number of parallel downloads
-    var retryAttempts = 3; // Number of retry attempts for a failed download
-    var chunkSize = 1024 * 1024 * 5; // 5MB chunks
+    var totalDownloaded = 0;
+    var lastSpeedUpdateTime = Date.now();
+    var lastDownloadedUpdate = 0;
+    var updateIntervalId = null;
 
-    function updateDownloadedSize(size) {
-      const now = Date.now();
-      totalDownloaded += size;
+    var parallelDownloads = 5;
+    var retryAttempts = 3;
+    var chunkSize = 1024 * 1024 * 200; // 200MB chunks
 
-      // Update speed every second
-      if (now - lastUpdateTime >= 1000 || lastUpdateTime === 0) {
-        const speed = (totalDownloaded - lastUpdateSize) / 1024 / 1024 * 1000 / (now - lastUpdateTime); // MB/s
+    function startUpdateLoop() {
+      updateIntervalId = setInterval(() => {
+        const now = Date.now();
+        const deltaDownload = totalDownloaded - lastDownloadedUpdate;
+        const deltaTime = now - lastSpeedUpdateTime;
+        const speed = (deltaDownload / 1024 / 1024 * 1000 / deltaTime); // MB/s
         document.getElementById("downloadSpeed").innerText = speed.toFixed(2) + " MB/s";
-        lastUpdateSize = totalDownloaded;
-        lastUpdateTime = now;
-      }
+        document.getElementById("downloadedSize").innerText = (totalDownloaded / 1024 / 1024 / 1024).toFixed(3) + " GB";
+        lastSpeedUpdateTime = now;
+        lastDownloadedUpdate = totalDownloaded; 
+      }, 1000);
+    }
 
-      // Update total size in GB
-      document.getElementById("downloadedSize").innerText = (totalDownloaded / 1024 / 1024 / 1024).toFixed(3) + " GB";
+    function stopUpdateLoop() {
+      clearInterval(updateIntervalId);
+      document.getElementById("downloadSpeed").innerText = "0.00 MB/s";
     }
 
     async function downloadChunk(fileUrl, startByte, endByte, retryCount = 0) {
@@ -43,9 +47,8 @@
 
         if (response.status === 206) {
           const blob = await response.blob();
-          updateDownloadedSize(blob.size);
+          totalDownloaded += blob.size;
         } else if (response.status === 416) {
-          // Reset start and end bytes if the end of the file is reached
           return {endOfFile: true};
         } else {
           throw new Error('Unexpected response status: ' + response.status);
@@ -58,12 +61,12 @@
         }
       }
     }
-
+    
     async function downloadFile() {
       if (!keepDownloading) return;
 
-      // const fileUrl = 'https://huggingface.co/datasets/TotoB12/temp/resolve/main/The%20Office%20(US)%20%20-%20Pilot%20-%20S01E01.mp4?download=true';
-      const fileUrl = 'https://raw.githubusercontent.com/TotoB12/snl/main/Cars%204%20-%20SNL.mp4'
+      const fileUrl = 'https://huggingface.co/datasets/TotoB12/temp/resolve/main/The%20Office%20(US)%20%20-%20Pilot%20-%20S01E01.mp4?download=true';
+      // const fileUrl = 'https://raw.githubusercontent.com/TotoB12/snl/main/Cars%204%20-%20SNL.mp4'
       let startByte = 0;
 
       while (keepDownloading) {
@@ -78,10 +81,23 @@
 
         const results = await Promise.all(downloadPromises);
         if (results.some(result => result && result.endOfFile)) {
-          // Reset the start byte counter if the end of the file is reached
           startByte = 0;
         }
       }
+    }
+
+    function updateDownloadedSize(size) {
+      const now = Date.now();
+      totalDownloaded += size;
+
+      if (now - lastUpdateTime >= 1000 || lastUpdateTime === 0) {
+        const speed = (totalDownloaded - lastUpdateSize) / 1024 / 1024 * 1000 / (now - lastUpdateTime); // MB/s
+        document.getElementById("downloadSpeed").innerText = speed.toFixed(2) + " MB/s";
+        lastUpdateSize = totalDownloaded;
+        lastUpdateTime = now;
+      }
+
+      document.getElementById("downloadedSize").innerText = (totalDownloaded / 1024 / 1024 / 1024).toFixed(3) + " GB";
     }
 
     function toggleDownload() {
@@ -89,15 +105,13 @@
       document.getElementById("toggleButton").innerText = keepDownloading ? "Stop Download" : "Start Download";
 
       if (keepDownloading) {
-        lastUpdateTime = 0;
-        lastUpdateSize = 0;
+        startUpdateLoop();
         downloadFile();
       } else {
-        document.getElementById("downloadSpeed").innerText = "0.00 MB/s"; // Reset speed to 0 when stopped
+        stopUpdateLoop();
       }
     }
 
-    // Modified toggleDownload function to work with the switch
     document.addEventListener("DOMContentLoaded", function () {
       const toggleInput = document.querySelector('.toggle-input');
       toggleInput.addEventListener('change', function () {
