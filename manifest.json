@@ -3,7 +3,7 @@
   "short_name": "Data User",
   "icons": [
     {
-      "src": "/D.png",
+      "src": "D.png",
       "sizes": "192x192",
       "type": "image/png"
     }
