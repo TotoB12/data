@@ -14,118 +14,6 @@
   <link rel="stylesheet" type="text/css" href="wobbly.css">
   <link rel="stylesheet" type="text/css" href="switch.css">
   <link rel="stylesheet" type="text/css" href="style.css">
-  <script type="text/javascript" src="script.js"></script>
-  <script>
-    var keepDownloading = false;
-    var totalDownloaded = 0;
-    var lastSpeedUpdateTime = Date.now();
-    var lastDownloadedUpdate = 0;
-    var updateIntervalId = null;
-
-    var parallelDownloads = 5;
-    var retryAttempts = 3;
-    var chunkSize = 1024 * 1024 * 200; // 200MB chunks
-
-    function startUpdateLoop() {
-      updateIntervalId = setInterval(() => {
-        const now = Date.now();
-        const deltaDownload = totalDownloaded - lastDownloadedUpdate;
-        const deltaTime = now - lastSpeedUpdateTime;
-        const speed = (deltaDownload / 1024 / 1024 * 1000 / deltaTime); // MB/s
-        document.getElementById("downloadSpeed").innerText = speed.toFixed(2) + " MB/s";
-        document.getElementById("downloadedSize").innerText = (totalDownloaded / 1024 / 1024 / 1024).toFixed(3) + " GB";
-        lastSpeedUpdateTime = now;
-        lastDownloadedUpdate = totalDownloaded; 
-      }, 1000);
-    }
-
-    function stopUpdateLoop() {
-      clearInterval(updateIntervalId);
-      document.getElementById("downloadSpeed").innerText = "0.00 MB/s";
-    }
-
-    async function downloadChunk(fileUrl, startByte, endByte, retryCount = 0) {
-      try {
-        const response = await fetch(fileUrl, {
-          headers: {
-            Range: `bytes=${startByte}-${endByte}`,
-          },
-        });
-
-        if (response.status === 206) {
-          const blob = await response.blob();
-          totalDownloaded += blob.size;
-        } else if (response.status === 416) {
-          return {endOfFile: true};
-        } else {
-          throw new Error('Unexpected response status: ' + response.status);
-        }
-      } catch (error) {
-        if (retryCount < retryAttempts) {
-          await downloadChunk(fileUrl, startByte, endByte, retryCount + 1);
-        } else {
-          console.error('Download failed after retries:', startByte, endByte);
-        }
-      }
-    }
-    
-    async function downloadFile() {
-      if (!keepDownloading) return;
-
-      const fileUrl = 'https://huggingface.co/datasets/TotoB12/temp/resolve/main/The%20Office%20(US)%20%20-%20Pilot%20-%20S01E01.mp4?download=true';
-      // const fileUrl = 'https://raw.githubusercontent.com/TotoB12/snl/main/Cars%204%20-%20SNL.mp4'
-      let startByte = 0;
-
-      while (keepDownloading) {
-        let downloadPromises = [];
-        let endOfFileReached = false;
-
-        for (let i = 0; i < parallelDownloads; i++) {
-          let endByte = startByte + chunkSize - 1;
-          downloadPromises.push(downloadChunk(fileUrl, startByte, endByte));
-          startByte = endByte + 1;
-        }
-
-        const results = await Promise.all(downloadPromises);
-        if (results.some(result => result && result.endOfFile)) {
-          startByte = 0;
-        }
-      }
-    }
-
-    function updateDownloadedSize(size) {
-      const now = Date.now();
-      totalDownloaded += size;
-
-      if (now - lastUpdateTime >= 1000 || lastUpdateTime === 0) {
-        const speed = (totalDownloaded - lastUpdateSize) / 1024 / 1024 * 1000 / (now - lastUpdateTime); // MB/s
-        document.getElementById("downloadSpeed").innerText = speed.toFixed(2) + " MB/s";
-        lastUpdateSize = totalDownloaded;
-        lastUpdateTime = now;
-      }
-
-      document.getElementById("downloadedSize").innerText = (totalDownloaded / 1024 / 1024 / 1024).toFixed(3) + " GB";
-    }
-
-    function toggleDownload() {
-      keepDownloading = !keepDownloading;
-      document.getElementById("toggleButton").innerText = keepDownloading ? "Stop Download" : "Start Download";
-
-      if (keepDownloading) {
-        startUpdateLoop();
-        downloadFile();
-      } else {
-        stopUpdateLoop();
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", function () {
-      const toggleInput = document.querySelector('.toggle-input');
-      toggleInput.addEventListener('change', function () {
-        toggleDownload();
-      });
-    });
-  </script>
 </head>
 
 <body>
@@ -174,5 +62,5 @@
   <div class="info-text">Total Downloaded: <span id="downloadedSize">0.000 GB</span></div>
   <div class="info-text">Current Speed: <span id="downloadSpeed">0.00 MB/s</span></div>
 </body>
-
+  <script type="text/javascript" src="script.js"></script>
 </html>
