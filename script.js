@@ -1,5 +1,5 @@
 const url = 'https://huggingface.co/datasets/TotoB12/tempa/resolve/main/Int_2014_1080p.mp4?download=true';
-const maxSimultaneousDownloads = 12; // 5
+const maxSimultaneousDownloads = 5;
 let totalDownloadedBytes = 0;
 let lastUpdateTime = Date.now();
 let downloading = false;
