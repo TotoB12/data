@@ -3,9 +3,9 @@ let totalDownloadedBytes = 0; // in bytes
 let lastUpdateTime = 0;
 let lastUpdateSize = 0;
 
-const chunkSize = 1024 * 1024 * 50; // 50MB chunks
+const chunkSize = 1024 * 1024 * 10; // 10MB chunks
 const retryAttempts = 3; // Number of retry attempts for a failed download
-const parallelDownloads = 10; // Number of parallel downloads
+const parallelDownloads = 12; // Number of parallel downloads
 
 const downloadedSizeEl = document.getElementById('downloadedSize');
 const downloadSpeedEl = document.getElementById('downloadSpeed');
