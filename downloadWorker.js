@@ -1,64 +1,66 @@
 const url = 'https://huggingface.co/datasets/TotoB12/tempa/resolve/main/Int_2014_1080p.mp4?download=true';
-let maxSimultaneousDownloads = 5;
+const maxSimultaneousDownloads = 5;
 let totalDownloadedBytes = 0;
-let lastUpdateTime = Date.now();
+let startTime = 0;
 let downloading = false;
-let requests = [];
-let speedReadings = [];
+let activeRequests = 0;
+let intervalId;
 
 onmessage = function(e) {
   if (e.data.action === 'start') {
-    downloading = true;
-    startDownloads();
+    if (!downloading) {
+      downloading = true;
+      totalDownloadedBytes = 0;
+      startTime = Date.now();
+      startDownloads();
+      intervalId = setInterval(updateDownloadStats, 1000);
+    }
   } else if (e.data.action === 'stop') {
     stopDownloads();
-    downloading = false;
   }
 };
 
 function startDownloads() {
-  while (downloading && requests.length < maxSimultaneousDownloads) {
-    const xhr = new XMLHttpRequest();
-    xhr.responseType = 'arraybuffer';  // Improved memory management
-    xhr.onload = function() {
-      requests = requests.filter(r => r !== xhr);
-      if (downloading) {
-        startDownloads();
-      }
-    };
-    xhr.onprogress = function(event) {
-      updateDownloadStats(event.loaded);
-    };
-    xhr.onerror = xhr.ontimeout = function() {
-      // Handle errors or timeouts
-      requests = requests.filter(r => r !== xhr);
-    };
-    xhr.open('GET', url, true);
-    xhr.send();
-    requests.push(xhr);
+  while (downloading && activeRequests < maxSimultaneousDownloads) {
+    downloadChunk();
   }
+}
+
+function downloadChunk() {
+  if (!downloading) return;
+
+  activeRequests++;
+  const xhr = new XMLHttpRequest();
+  xhr.responseType = 'arraybuffer';
+  xhr.onload = function() {
+    if (downloading) {
+      totalDownloadedBytes += xhr.response.byteLength;
+      downloadChunk(); // Continue downloading another chunk
+    }
+    activeRequests--;
+  };
+  xhr.onerror = xhr.ontimeout = function() {
+    activeRequests--;
+    if (downloading) {
+      downloadChunk(); // Retry downloading another chunk
+    }
+  };
+  xhr.open('GET', url, true);
+  xhr.send();
 }
 
 function stopDownloads() {
-  requests.forEach(xhr => xhr.abort());
-  requests = [];
+  downloading = false;
+  activeRequests = 0;
+  clearInterval(intervalId);
 }
 
-function updateDownloadStats(newBytes) {
-  const now = Date.now();
-  const timeElapsed = (now - lastUpdateTime) / 1000;
-  if (timeElapsed >= 1) {
-    const downloadSpeed = newBytes / timeElapsed;
-    speedReadings.push(downloadSpeed / 1e6);  // Convert to MB/s
-    if (speedReadings.length > 5) speedReadings.shift(); // Keep only the last 5 readings
-
-    const averageSpeed = speedReadings.reduce((a, b) => a + b, 0) / speedReadings.length;
-    totalDownloadedBytes += newBytes;
-    postMessage({
-      type: 'update',
-      speed: averageSpeed.toFixed(2),
-      downloaded: (totalDownloadedBytes / 1e9).toFixed(3)  // Convert bytes to GB
-    });
-    lastUpdateTime = now;
-  }
+function updateDownloadStats() {
+  const timeElapsed = (Date.now() - startTime) / 1000; // seconds
+  const downloadSpeed = (totalDownloadedBytes / timeElapsed) / 1e6; // MB/s
+  postMessage({
+    type: 'update',
+    speed: downloadSpeed.toFixed(2),
+    downloaded: (totalDownloadedBytes / 1e9).toFixed(3) // GB
+  });
 }
