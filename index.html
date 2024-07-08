@@ -1,49 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bandwidth Test</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: #282c34;
-            color: #abb2bf;
+            background-color: #121212;
+            color: #e0e0e0;
         }
+
         .container {
             text-align: center;
-            background-color: #21252b;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
+
+        @keyframes rotateShadow {
+            0% {
+                text-shadow: 5px 0 10px rgba(40, 167, 69, 0.3);
+            }
+
+            25% {
+                text-shadow: 0 5px 10px rgba(40, 167, 69, 0.3);
+            }
+
+            50% {
+                text-shadow: -5px 0 10px rgba(40, 167, 69, 0.3);
+            }
+
+            75% {
+                text-shadow: 0 -5px 10px rgba(40, 167, 69, 0.3);
+            }
+
+            100% {
+                text-shadow: 5px 0 10px rgba(40, 167, 69, 0.3);
+            }
+        }
+
         h1 {
-            margin-bottom: 1rem;
-            color: #61afef;
+            margin-bottom: 2rem;
+            color: #28a745;
+            font-size: 2.5rem;
+            animation: rotateShadow 4s linear infinite;
         }
+
         .info-text {
-            margin: 0.5rem 0;
+            margin: 1rem 0;
             font-size: 1.2rem;
         }
+
         .toggle-container {
-            margin: 1rem 0;
+            margin: 2rem 0;
         }
+
         .toggle-switch {
             position: relative;
             display: inline-block;
             width: 60px;
             height: 34px;
         }
+
         .toggle-switch input {
             opacity: 0;
             width: 0;
             height: 0;
         }
+
         .slider {
             position: absolute;
             cursor: pointer;
@@ -51,10 +79,11 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #4b5263;
+            background-color: #2c2c2c;
             transition: .4s;
             border-radius: 34px;
         }
+
         .slider:before {
             position: absolute;
             content: "";
@@ -62,22 +91,33 @@
             width: 26px;
             left: 4px;
             bottom: 4px;
-            background-color: #abb2bf;
+            background-color: #e0e0e0;
             transition: .4s;
             border-radius: 50%;
         }
-        input:checked + .slider {
-            background-color: #98c379;
+
+        input:checked+.slider {
+            background-color: #28a745;
         }
-        input:checked + .slider:before {
+
+        input:checked+.slider:before {
             transform: translateX(26px);
         }
-        #downloadedSize, #downloadSpeed {
-            color: #e5c07b;
+
+        #downloadedSize,
+        #downloadSpeed {
+            color: #28a745;
             font-weight: bold;
+        }
+
+        .status {
+            margin-top: 1rem;
+            font-size: 1rem;
+            color: #888;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Bandwidth Test</h1>
@@ -89,6 +129,7 @@
         </div>
         <div class="info-text">Total Downloaded: <span id="downloadedSize">0.000 GB</span></div>
         <div class="info-text">Current Speed: <span id="downloadSpeed">0.00 MB/s</span></div>
+        <div class="status" id="status">Idle</div>
     </div>
     <script>
         let keepDownloading = false;
@@ -103,6 +144,7 @@
         const downloadedSizeEl = document.getElementById('downloadedSize');
         const downloadSpeedEl = document.getElementById('downloadSpeed');
         const toggleButton = document.getElementById('toggleButton');
+        const statusEl = document.getElementById('status');
 
         toggleButton.addEventListener('change', toggleDownload);
 
@@ -132,7 +174,7 @@
                     const blob = await response.blob();
                     updateDownloadedSize(blob.size);
                 } else if (response.status === 416) {
-                    return { endOfFile: true };
+                    return {endOfFile: true};
                 } else {
                     throw new Error('Unexpected response status: ' + response.status);
                 }
@@ -173,11 +215,14 @@
             if (keepDownloading) {
                 lastUpdateTime = 0;
                 lastUpdateSize = 0;
+                statusEl.innerText = "Running";
                 downloadFile();
             } else {
                 downloadSpeedEl.innerText = "0.00 MB/s";
+                statusEl.innerText = "Stopped";
             }
         }
     </script>
 </body>
+
 </html>
