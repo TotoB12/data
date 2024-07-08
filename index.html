@@ -7,7 +7,7 @@
     <title>TotoB12 Data</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: PolySans Bulky, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -15,6 +15,21 @@
             margin: 0;
             background-color: #121212;
             color: #e0e0e0;
+        }
+
+        @font-face {
+            font-family: 'PolySans Bulky';
+            src: url('/fonts/PolySans Bulky.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'PolySans Neutral';
+            src: url('/fonts/PolySans Neutral.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'PolySans Slim';
+            src: url('/fonts/PolySans Slim.ttf') format('truetype');
         }
 
         .container {
@@ -44,7 +59,7 @@
         }
 
         h1 {
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
             color: #28a745;
             font-size: 2.5rem;
             animation: rotateShadow 4s linear infinite;
@@ -53,10 +68,11 @@
         .info-text {
             margin: 1rem 0;
             font-size: 1.2rem;
+            font-family: PolySans Neutral;
         }
 
         .toggle-container {
-            margin: 2rem 0;
+            margin: 1rem 0;
         }
 
         .toggle-switch {
