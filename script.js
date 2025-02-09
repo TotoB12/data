@@ -1,10 +1,10 @@
-// URL of the CDN file (using the latest file)
+// Updated fileUrl from your instructions
 const fileUrl = "https://huggingface.co/datasets/TotoB12/tempa/resolve/main/dpt.mp4?download=true";
 
 // Global state variables
 let isDownloading = false;
-let totalBytes = 0; // This value is cumulative across sessions
-const maxConcurrent = 12; // Adjust to control the number of simultaneous fetches
+let totalBytes = 0; // Cumulative total across sessions
+const maxConcurrent = 12; // Number of simultaneous fetches
 let activeControllers = [];
 let speedInterval;
 let lastBytes = 0;
@@ -16,7 +16,7 @@ const downloadSpeedEl = document.getElementById("downloadSpeed");
 const statusEl = document.getElementById("status");
 const toggleButton = document.getElementById("toggleButton");
 
-// Toggle the download process when the switch is changed
+// Toggle download process when the switch is changed
 toggleButton.addEventListener("change", toggleDownload);
 
 function toggleDownload() {
@@ -29,18 +29,17 @@ function toggleDownload() {
 
 function startConsumption() {
   isDownloading = true;
-  // Do not reset totalBytes so that the cumulative amount persists.
-  // Instead, update the reference for measuring speed.
+  // Do not reset totalBytes; update the baseline for speed calculation instead.
   lastBytes = totalBytes;
   lastTime = Date.now();
   statusEl.textContent = "Running";
-
-  // Start a number of parallel tasks
+  
+  // Spawn the parallel tasks
   for (let i = 0; i < maxConcurrent; i++) {
     spawnTask();
   }
-
-  // Start a periodic update of the stats
+  
+  // Update statistics every second
   speedInterval = setInterval(updateStats, 1000);
 }
 
@@ -49,19 +48,19 @@ function stopConsumption() {
   statusEl.textContent = "Stopped";
   clearInterval(speedInterval);
   downloadSpeedEl.textContent = "0.00 MB/s";
-
-  // Abort any active fetch requests to stop data consumption immediately
+  
+  // Abort any active fetch requests immediately
   activeControllers.forEach(controller => controller.abort());
   activeControllers = [];
 }
 
-// Continuously spawn a new fetch task while consumption is active
+// Spawn a fetch task that continuously downloads data while active
 async function spawnTask() {
   while (isDownloading) {
-    // Create a new AbortController for this fetch
+    // Create an AbortController for the fetch
     const controller = new AbortController();
     activeControllers.push(controller);
-
+    
     try {
       // Append a random query parameter to avoid caching
       let url = fileUrl + (fileUrl.includes("?") ? "&" : "?") + "rand=" + Math.random();
@@ -69,8 +68,8 @@ async function spawnTask() {
       if (!response.ok) {
         throw new Error("HTTP error " + response.status);
       }
-
-      // Use the ReadableStream API to read and immediately discard chunks while counting bytes
+      
+      // Read the stream and count the bytes without saving data locally
       const reader = response.body.getReader();
       while (isDownloading) {
         const { done, value } = await reader.read();
@@ -82,7 +81,7 @@ async function spawnTask() {
         console.error("Fetch error:", error);
       }
     } finally {
-      // Remove this controller from our list
+      // Remove this controller from our active list
       const index = activeControllers.indexOf(controller);
       if (index > -1) {
         activeControllers.splice(index, 1);
@@ -91,7 +90,7 @@ async function spawnTask() {
   }
 }
 
-// Update the UI with the latest download statistics every second
+// Update download statistics in the UI every second
 function updateStats() {
   const now = Date.now();
   const elapsed = (now - lastTime) / 1000; // seconds elapsed

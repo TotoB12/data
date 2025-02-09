@@ -4,11 +4,27 @@ body {
     padding: 0;
     background-color: #121212;
     color: #e0e0e0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: PolySans Bulky, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    min-height: 100vh;
+}
+
+
+@font-face {
+    font-family: 'PolySans Bulky';
+    src: url('fonts/PolySans Bulky.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'PolySans Neutral';
+    src: url('fonts/PolySans Neutral.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'PolySans Slim';
+    src: url('fonts/PolySans Slim.ttf') format('truetype');
 }
 
 /* Container for centering content */
@@ -17,11 +33,46 @@ body {
     padding: 20px;
 }
 
-/* Header style */
-h1 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: #28a745;
+/* Header text with scribble effect (from old.html) */
+h7 {
+    font-weight: 140;
+    letter-spacing: -0.05ch;
+    font-size: clamp(4rem, 12vw + 2rem, 16rem);
+    background: linear-gradient(#00b050, hsl(0, 0%, 50%));
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 1px hsl(0, 0%, 90%);
+    margin: 0;
+    line-height: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    h7 {
+        animation: scribble infinite 0.2s;
+    }
+}
+
+@keyframes scribble {
+    0% {
+        filter: url("#scribble--0");
+    }
+
+    25% {
+        filter: url("#scribble--1");
+    }
+
+    50% {
+        filter: url("#scribble--2");
+    }
+
+    75% {
+        filter: url("#scribble--3");
+    }
+
+    100% {
+        filter: url("#scribble--4");
+    }
 }
 
 /* Statistics display */
@@ -44,7 +95,7 @@ h1 {
 .toggle-container {
     position: relative;
     width: 150px;
-    margin: 0 auto;
+    margin: 1.5rem auto;
 }
 
 .toggle-input {
