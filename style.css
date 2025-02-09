@@ -27,17 +27,13 @@ body {
     src: url('fonts/PolySans Slim.ttf') format('truetype');
 }
 
-/* Container for centering content */
 .container {
     text-align: center;
     padding: 20px;
 }
 
-/* Header text with scribble effect (from old.html) */
 h7 {
-    font-weight: 140;
-    letter-spacing: -0.05ch;
-    font-size: clamp(4rem, 12vw + 2rem, 16rem);
+    font-size: clamp(4rem, 5vw + 2rem, 16rem);
     background: linear-gradient(#00b050, hsl(0, 0%, 50%));
     background-clip: text;
     -webkit-background-clip: text;
@@ -75,23 +71,21 @@ h7 {
     }
 }
 
-/* Statistics display */
 .stats {
     margin-top: 1.5rem;
 }
 
 .info-text {
-    font-size: 1.2rem;
+    font-size: 1.4rem;
     margin: 0.5rem 0;
 }
 
 .status {
     margin-top: 1rem;
-    font-size: 1rem;
+    font-size: 1.2rem;
     color: #888;
 }
 
-/* Toggle Switch Styles – using the old SVG switch design */
 .toggle-container {
     position: relative;
     width: 150px;
