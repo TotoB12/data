@@ -1,91 +1,106 @@
-let keepDownloading = false;
-let totalDownloadedBytes = 0; // in bytes
-let lastUpdateTime = 0;
-let lastUpdateSize = 0;
+// URL of the CDN file (using the latest file)
+const fileUrl = "https://huggingface.co/datasets/TotoB12/tempa/resolve/main/dpt.mp4?download=true";
 
-const chunkSize = 1024 * 1024 * 10; // 10MB chunks
-const retryAttempts = 3; // Number of retry attempts for a failed download
-const parallelDownloads = 12; // Number of parallel downloads
+// Global state variables
+let isDownloading = false;
+let totalBytes = 0; // This value is cumulative across sessions
+const maxConcurrent = 12; // Adjust to control the number of simultaneous fetches
+let activeControllers = [];
+let speedInterval;
+let lastBytes = 0;
+let lastTime = Date.now();
 
-const downloadedSizeEl = document.getElementById('downloadedSize');
-const downloadSpeedEl = document.getElementById('downloadSpeed');
-const toggleButton = document.getElementById('toggleButton');
+// UI elements
+const downloadedSizeEl = document.getElementById("downloadedSize");
+const downloadSpeedEl = document.getElementById("downloadSpeed");
+const statusEl = document.getElementById("status");
+const toggleButton = document.getElementById("toggleButton");
 
-toggleButton.addEventListener('change', toggleDownload);
-
-function updateDownloadedSize(size) {
-  const now = Date.now();
-  totalDownloadedBytes += size;
-
-  // Update speed every second
-  if (now - lastUpdateTime >= 1000 || lastUpdateTime === 0) {
-    const speed = (totalDownloadedBytes - lastUpdateSize) / 1024 / 1024 * 1000 / (now - lastUpdateTime); // MB/s
-    downloadSpeedEl.innerText = speed.toFixed(2) + " MB/s";
-    lastUpdateSize = totalDownloadedBytes;
-    lastUpdateTime = now;
-  }
-
-  // Update total size in GB
-  downloadedSizeEl.innerText = (totalDownloadedBytes / 1024 / 1024 / 1024).toFixed(3) + " GB";
-}
-
-async function downloadChunk(fileUrl, startByte, endByte, retryCount = 0) {
-  try {
-    const response = await fetch(fileUrl, {
-      headers: {
-        'Range': `bytes=${startByte}-${endByte}`,
-      },
-    });
-
-    if (response.status === 206) {
-      const blob = await response.blob();
-      updateDownloadedSize(blob.size);
-    } else if (response.status === 416) {
-      // Reset start and end bytes if the end of the file is reached
-      return { endOfFile: true };
-    } else {
-      throw new Error('Unexpected response status: ' + response.status);
-    }
-  } catch (error) {
-    if (retryCount < retryAttempts) {
-      await downloadChunk(fileUrl, startByte, endByte, retryCount + 1);
-    } else {
-      console.error('Download failed after retries:', startByte, endByte);
-    }
-  }
-}
-
-async function downloadFile() {
-  if (!keepDownloading) return;
-
-  const fileUrl = 'https://huggingface.co/datasets/TotoB12/tempa/resolve/main/Int_2014_1080p.mp4?download=true';
-  let startByte = 0;
-
-  while (keepDownloading) {
-    let downloadPromises = [];
-    for (let i = 0; i < parallelDownloads; i++) {
-      let endByte = startByte + chunkSize - 1;
-      downloadPromises.push(downloadChunk(fileUrl, startByte, endByte));
-      startByte = endByte + 1;
-    }
-
-    const results = await Promise.all(downloadPromises);
-    if (results.some(result => result && result.endOfFile)) {
-      // Reset the start byte counter if the end of the file is reached
-      startByte = 0;
-    }
-  }
-}
+// Toggle the download process when the switch is changed
+toggleButton.addEventListener("change", toggleDownload);
 
 function toggleDownload() {
-  keepDownloading = !keepDownloading;
-  toggleButton.checked = keepDownloading;
-
-  if (keepDownloading) {
-    lastUpdateTime = 0;
-    lastUpdateSize = 0;
-    downloadFile();
+  if (toggleButton.checked) {
+    startConsumption();
   } else {
-    downloadSpeedEl.innerText = "0.00 MB/s"; // Reset speed to 0 when stopped
+    stopConsumption();
   }
+}
+
+function startConsumption() {
+  isDownloading = true;
+  // Do not reset totalBytes so that the cumulative amount persists.
+  // Instead, update the reference for measuring speed.
+  lastBytes = totalBytes;
+  lastTime = Date.now();
+  statusEl.textContent = "Running";
+
+  // Start a number of parallel tasks
+  for (let i = 0; i < maxConcurrent; i++) {
+    spawnTask();
+  }
+
+  // Start a periodic update of the stats
+  speedInterval = setInterval(updateStats, 1000);
+}
+
+function stopConsumption() {
+  isDownloading = false;
+  statusEl.textContent = "Stopped";
+  clearInterval(speedInterval);
+  downloadSpeedEl.textContent = "0.00 MB/s";
+
+  // Abort any active fetch requests to stop data consumption immediately
+  activeControllers.forEach(controller => controller.abort());
+  activeControllers = [];
+}
+
+// Continuously spawn a new fetch task while consumption is active
+async function spawnTask() {
+  while (isDownloading) {
+    // Create a new AbortController for this fetch
+    const controller = new AbortController();
+    activeControllers.push(controller);
+
+    try {
+      // Append a random query parameter to avoid caching
+      let url = fileUrl + (fileUrl.includes("?") ? "&" : "?") + "rand=" + Math.random();
+      const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+      if (!response.ok) {
+        throw new Error("HTTP error " + response.status);
+      }
+
+      // Use the ReadableStream API to read and immediately discard chunks while counting bytes
+      const reader = response.body.getReader();
+      while (isDownloading) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.byteLength;
+      }
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        console.error("Fetch error:", error);
+      }
+    } finally {
+      // Remove this controller from our list
+      const index = activeControllers.indexOf(controller);
+      if (index > -1) {
+        activeControllers.splice(index, 1);
+      }
+    }
+  }
+}
+
+// Update the UI with the latest download statistics every second
+function updateStats() {
+  const now = Date.now();
+  const elapsed = (now - lastTime) / 1000; // seconds elapsed
+  const bytesSince = totalBytes - lastBytes;
+  const speed = bytesSince / (1024 * 1024) / elapsed; // MB/s
+
+  downloadSpeedEl.textContent = speed.toFixed(2) + " MB/s";
+  downloadedSizeEl.textContent = (totalBytes / (1024 * 1024 * 1024)).toFixed(3) + " GB";
+
+  lastBytes = totalBytes;
+  lastTime = now;
 }
