@@ -1,5 +1,5 @@
 // const fileUrl = "https://huggingface.co/datasets/TotoB12/tempa/resolve/main/dpt.mp4?download=true";
-const fileUrl = "https://github.com/six2dez/OneListForAll/raw/refs/heads/main/onelistforall.txt.7z.001";
+const fileUrl = "https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js";
 let isDownloading = false;
 let totalBytes = 0;
 const maxConcurrent = 12;
