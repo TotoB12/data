@@ -64,7 +64,7 @@ body {
   font-size: clamp(3rem, 8vw, 5.5rem);
   margin: 0.25rem 0;
   letter-spacing: 0.06em;
-  background: linear-gradient(140deg, #00b050, #7ddc8b 60%, #e5e5e5);
+  background: linear-gradient(140deg, #00a046, #0fcf5c 55%, #6fdc94);
   -webkit-background-clip: text;
   color: transparent;
   -webkit-text-stroke: 1px rgba(0, 64, 24, 0.35);
