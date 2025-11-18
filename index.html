@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TotoB12 Data</title>
+  <meta name="theme-color" content="#0d0d0d" />
+  <title>Data Flood Console</title>
+  <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <svg style="display: none;">
+  <svg style="position: absolute; width: 0; height: 0; overflow: hidden;">
     <filter id="scribble--0">
       <feturbulence basefrequency="0.02" numoctaves="3" result="noise" seed="0"></feturbulence>
       <fedisplacementmap in="SourceGraphic" in2="noise" scale="2"></fedisplacementmap>
@@ -30,33 +32,84 @@
     </filter>
   </svg>
 
-  <div class="container">
-    <h7>TotoB12 Data</h7>
-    
-    <div class="toggle-container">
-      <input class="toggle-input" type="checkbox" id="toggleButton" />
-      <svg class="toggle" viewBox="0 0 292 142" xmlns="http://www.w3.org/2000/svg">
-        <path class="toggle-background" d="M71 142C31.7878 142 0 110.212 0 71C0 31.7878 31.7878 0 71 0C110.212 0 119 30 146 30C173 30 182 0 221 0C260 0 292 31.7878 292 71C292 110.212 260.212 142 221 142C181.788 142 173 112 146 112C119 112 110.212 142 71 142Z" />
-        <rect class="toggle-icon on" x="64" y="39" width="12" height="64" rx="6" />
-        <path class="toggle-icon off" fill-rule="evenodd" d="M221 91C232.046 91 241 82.0457 241 71C241 59.9543 232.046 51 221 51C209.954 51 201 59.9543 201 71C201 82.0457 209.954 91 221 91ZM221 103C238.673 103 253 88.6731 253 71C253 53.3269 238.673 39 221 39C203.327 39 189 53.3269 189 71C189 88.6731 203.327 103 221 103Z" />
-        <g filter="url('#goo')">
-          <rect class="toggle-circle-center" x="13" y="42" width="116" height="58" rx="29" fill="#fff" />
-          <rect class="toggle-circle left" x="14" y="14" width="114" height="114" rx="58" fill="#fff" />
-          <rect class="toggle-circle right" x="164" y="14" width="114" height="114" rx="58" fill="#fff" />
-        </g>
-        <filter id="goo">
-          <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="10" />
-          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
-        </filter>
-      </svg>
-    </div>
-    
-    <div class="stats">
-      <div class="info-text">Total Downloaded: <span id="downloadedSize">0.000 GB</span></div>
-      <div class="info-text">Current Speed: <span id="downloadSpeed">0.00 MB/s</span></div>
-      <div class="status" id="status">Idle</div>
-    </div>
-  </div>
+  <main class="app-shell">
+    <header class="hero">
+      <p class="eyebrow">Bandwidth Lab</p>
+      <h1 class="hero-title">Data Flood Console</h1>
+      <p class="subhead">Spin up aggressive fetch streams to stress-test any data plan. Keep the browser foregrounded and stay on power for the fastest drain.</p>
+    </header>
+
+    <section class="panel toggle-panel">
+      <div class="toggle-wrapper">
+        <label class="switch" for="toggleButton">
+          <span class="switch-label">Data storm</span>
+          <input type="checkbox" id="toggleButton" />
+        </label>
+        <div class="status-chip" id="status">Idle</div>
+      </div>
+      <div class="hint-row">
+        <p class="hint">The counter below tracks encoded payload bytes so onboard usage dashboards match what you see here.</p>
+        <button type="button" class="ghost-button" id="resetStats">Reset counters</button>
+      </div>
+    </section>
+
+    <section class="panel stats-grid" aria-live="polite">
+      <article class="stat-card">
+        <p class="label">Verified data transfer</p>
+        <p class="value" id="downloadedSize">0.000 GB</p>
+        <p class="detail">Counts encoded bytes from the network layer.</p>
+      </article>
+      <article class="stat-card">
+        <p class="label">Current speed</p>
+        <p class="value" id="downloadSpeed">0.00 MB/s</p>
+        <p class="detail" id="peakSpeed">Peak 0.00 MB/s</p>
+      </article>
+      <article class="stat-card">
+        <p class="label">Active streams</p>
+        <p class="value" id="workerCount">0 / 0</p>
+        <p class="detail">Chunk size <span id="chunkSize">0 MB</span></p>
+      </article>
+      <article class="stat-card">
+        <p class="label">Session time</p>
+        <p class="value" id="sessionDuration">00:00:00</p>
+        <p class="detail">Top sources: <span id="sourceSummary">Waiting for samples</span></p>
+      </article>
+    </section>
+
+    <section class="panel control-grid">
+      <div class="control-block">
+        <div class="control-header">
+          <label for="aggressionSlider">Aggression preset</label>
+          <span id="aggressionLabel">Ludicrous flood</span>
+        </div>
+        <input type="range" min="0" max="2" step="1" value="2" id="aggressionSlider" />
+        <p class="hint">Adaptive tuning still runs automatically; this only raises or lowers its ceiling.</p>
+      </div>
+      <div class="control-block">
+        <label for="sourceSelect">Source mix</label>
+        <select id="sourceSelect">
+          <option value="auto">Auto mix (default)</option>
+          <option value="heavy">Heaviest only</option>
+          <option value="tailnet">Tailnet priority</option>
+          <option value="fallback">Fallback CDN</option>
+        </select>
+        <p class="hint" data-source-description>Preferred option for accurate OS data usage</p>
+      </div>
+    </section>
+
+    <section class="panel log-panel">
+      <div class="log-header">
+        <h2>Activity log</h2>
+        <button type="button" id="clearLog">Clear</button>
+      </div>
+      <div id="activityLog" class="log-entries" aria-live="polite"></div>
+    </section>
+
+    <footer class="footer">
+      <p>Tip: disable Auto-Lock, Low Data Mode, and any VPN compression for the most accurate burn measurements.</p>
+    </footer>
+  </main>
+
   <script src="script.js"></script>
 </body>
 </html>

@@ -1,0 +1,171 @@
+/* General page styles */
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #121212;
+    color: #e0e0e0;
+    font-family: PolySans Bulky, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+
+@font-face {
+    font-family: 'PolySans Bulky';
+    src: url('fonts/PolySans Bulky.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'PolySans Neutral';
+    src: url('fonts/PolySans Neutral.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'PolySans Slim';
+    src: url('fonts/PolySans Slim.ttf') format('truetype');
+}
+
+.container {
+    text-align: center;
+    padding: 20px;
+}
+
+h7 {
+    font-size: clamp(4rem, 5vw + 2rem, 16rem);
+    background: linear-gradient(#00b050, hsl(0, 0%, 50%));
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 1px hsl(0, 0%, 90%);
+    margin: 0;
+    line-height: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    h7 {
+        animation: scribble infinite 0.2s;
+    }
+}
+
+@keyframes scribble {
+    0% {
+        filter: url("#scribble--0");
+    }
+
+    25% {
+        filter: url("#scribble--1");
+    }
+
+    50% {
+        filter: url("#scribble--2");
+    }
+
+    75% {
+        filter: url("#scribble--3");
+    }
+
+    100% {
+        filter: url("#scribble--4");
+    }
+}
+
+.stats {
+    margin-top: 1.5rem;
+}
+
+.info-text {
+    font-size: 1.4rem;
+    margin: 0.5rem 0;
+}
+
+.status {
+    margin-top: 1rem;
+    font-size: 1.2rem;
+    color: #888;
+}
+
+.toggle-container {
+    position: relative;
+    width: 150px;
+    margin: 1.5rem auto;
+}
+
+.toggle-input {
+    appearance: none;
+    margin: 0;
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.toggle {
+    width: 100%;
+    height: auto;
+}
+
+.toggle-background {
+    fill: #d3d3d6;
+    transition: fill 0.4s;
+}
+
+.toggle-input:checked+.toggle .toggle-background {
+    fill: #35c759;
+}
+
+.toggle-icon {
+    transition: fill 0.4s;
+}
+
+.toggle-icon.on {
+    fill: #d3d3d6;
+}
+
+.toggle-input:checked+.toggle .toggle-icon.on {
+    fill: #fff;
+}
+
+.toggle-icon.off {
+    fill: #eaeaec;
+}
+
+.toggle-input:checked+.toggle .toggle-icon.off {
+    fill: #35c759;
+}
+
+.toggle-circle-center {
+    transform-origin: center;
+    transition: transform 0.6s;
+}
+
+.toggle-input:checked+.toggle .toggle-circle-center {
+    transform: translateX(150px);
+}
+
+.toggle-circle {
+    transform-origin: center;
+    backface-visibility: hidden;
+    transition: transform 0.45s;
+}
+
+.toggle-circle.left {
+    transform: scale(1);
+}
+
+.toggle-input:checked+.toggle .toggle-circle.left {
+    transform: scale(0);
+}
+
+.toggle-circle.right {
+    transform: scale(0);
+}
+
+.toggle-input:checked+.toggle .toggle-circle.right {
+    transform: scale(1);
+}

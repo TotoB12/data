@@ -1,14 +1,17 @@
 {
-  "name": "Data User",
-  "short_name": "Data User",
+  "name": "Data Flood Console",
+  "short_name": "DataFlood",
+  "description": "Adaptive bandwidth sink that maximizes encoded data usage for network testing.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#0d0d0d",
+  "background_color": "#080808",
   "icons": [
     {
       "src": "D.png",
       "sizes": "192x192",
       "type": "image/png"
     }
-  ],
-  "start_url": "",
-  "display": "standalone",
-  "theme_color": "#000000"
+  ]
 }
