@@ -13,7 +13,7 @@
       url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
       sizeBytes: 158008374,
       supportsRange: true,
-      weight: 3
+      weight: 4
     },
     {
       id: "sintel",
@@ -21,7 +21,7 @@
       url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
       sizeBytes: 215330292,
       supportsRange: true,
-      weight: 3
+      weight: 5
     },
     {
       id: "steel",
@@ -29,7 +29,7 @@
       url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
       sizeBytes: 185765954,
       supportsRange: true,
-      weight: 2
+      weight: 4
     },
     {
       id: "elephant",
@@ -37,7 +37,7 @@
       url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
       sizeBytes: 169612362,
       supportsRange: true,
-      weight: 2
+      weight: 4
     },
     {
       id: "subaru",
@@ -53,7 +53,7 @@
       url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4",
       sizeBytes: 43780763,
       supportsRange: true,
-      weight: 1
+      weight: 2
     },
     {
       id: "bullrun",
@@ -113,27 +113,27 @@
   };
 
   const AGGRESSION_PRESETS = [
-    { id: "eco", label: "Calm drain", minWorkers: 4, maxWorkers: 14, minChunkMB: 8, maxChunkMB: 64 },
-    { id: "balanced", label: "Balanced burn", minWorkers: 10, maxWorkers: 26, minChunkMB: 16, maxChunkMB: 128 },
-    { id: "ludicrous", label: "Ludicrous flood", minWorkers: 18, maxWorkers: 40, minChunkMB: 32, maxChunkMB: 256 }
+    { id: "eco", label: "Calm drain", minWorkers: 6, maxWorkers: 20, minChunkMB: 16, maxChunkMB: 128 },
+    { id: "balanced", label: "Balanced burn", minWorkers: 16, maxWorkers: 40, minChunkMB: 32, maxChunkMB: 256 },
+    { id: "ludicrous", label: "Ludicrous flood", minWorkers: 32, maxWorkers: 80, minChunkMB: 64, maxChunkMB: 512 }
   ];
 
   const CONFIG = {
-    statsInterval: 1000,
-    adaptInterval: 5000,
-    workerMaintainInterval: 900,
-    chunkHistoryLimit: 80,
-    speedHistoryLimit: 160,
-    chunkStepMB: 16,
-    trendThreshold: 0.2,
+    statsInterval: 500,
+    adaptInterval: 2000,
+    workerMaintainInterval: 500,
+    chunkHistoryLimit: 100,
+    speedHistoryLimit: 200,
+    chunkStepMB: 32,
+    trendThreshold: 0.15,
     logLimit: 40,
-    absoluteWorkerCap: 56,
-    absoluteChunkCap: 512,
-    burstExtraWorkers: 10,
-    burstChunkBoost: 128,
-    burstDuration: 20000,
-    burstCooldown: 45000,
-    burstSpeedDrop: 0.55,
+    absoluteWorkerCap: 120,
+    absoluteChunkCap: 1024,
+    burstExtraWorkers: 20,
+    burstChunkBoost: 256,
+    burstDuration: 30000,
+    burstCooldown: 20000,
+    burstSpeedDrop: 0.6,
     piProbeInterval: 60000,
     piProbeTimeout: 4500
   };
@@ -351,7 +351,7 @@
         if (error.name !== "AbortError" && state.running) {
           logEvent(`Worker ${worker.id} error: ${error.message}`, "warn");
         }
-        await wait(400);
+        await wait(200);
       } finally {
         worker.controller = null;
       }
@@ -367,7 +367,8 @@
       mode: "cors",
       signal,
       headers: descriptor.headers,
-      keepalive: true
+      keepalive: false,
+      priority: "high"
     });
 
     if (!response.ok && response.status !== 206) {
@@ -384,6 +385,7 @@
           logicalBytes += value.byteLength;
         }
       }
+      reader.releaseLock();
     } else {
       const buffer = await response.arrayBuffer();
       logicalBytes = buffer.byteLength;
@@ -439,12 +441,13 @@
 
   function computeSourceWeight(source, desiredBytes) {
     const perf = state.sourcePerf.get(source.id) || 1;
-    const tailnetBoost = source.tailnet ? 3 : 1;
-    const rangeFactor = source.supportsRange ? 1.2 : 0.85;
+    const tailnetBoost = source.tailnet ? 4 : 1;
+    const rangeFactor = source.supportsRange ? 1.5 : 0.7;
     const size = source.sizeBytes || desiredBytes;
     const ratio = size && desiredBytes ? Math.min(desiredBytes, size) / Math.max(desiredBytes, size) : 1;
-    const chunkFactor = source.supportsRange ? 0.9 + ratio : 0.6 + ratio;
-    return Math.max((source.weight || 1) * tailnetBoost * rangeFactor * chunkFactor * (1 + perf / 10), 0.1);
+    const chunkFactor = source.supportsRange ? 0.9 + ratio : 0.5 + ratio;
+    const sizeBias = size > 100 * MB ? 1.5 : 1.0;
+    return Math.max((source.weight || 1) * tailnetBoost * rangeFactor * chunkFactor * sizeBias * (1 + perf / 8), 0.1);
   }
 
   function recordChunkStats(chunk) {
@@ -505,8 +508,8 @@
     if (!state.running) return;
     tickBurstState();
 
-    const recentSpeeds = state.speedSamples.slice(-8);
-    if (recentSpeeds.length < 4) return;
+    const recentSpeeds = state.speedSamples.slice(-6);
+    if (recentSpeeds.length < 3) return;
 
     const avgSpeed = recentSpeeds.reduce((sum, sample) => sum + sample.speed, 0) / recentSpeeds.length;
     if (avgSpeed > state.bestSpeed) {
@@ -516,11 +519,11 @@
 
     const trend = recentSpeeds[recentSpeeds.length - 1].speed - recentSpeeds[0].speed;
     if (trend > CONFIG.trendThreshold && state.workerTarget < currentMaxWorkers()) {
-      adjustWorkers(2, "trend up");
+      adjustWorkers(4, "trend up");
       return;
     }
     if (trend < -CONFIG.trendThreshold && state.workerTarget > state.limits.minWorkers) {
-      adjustWorkers(-1, "trend dip");
+      adjustWorkers(-2, "trend dip");
     }
 
     const slowestSample = recentSpeeds.reduce((min, sample) => Math.min(min, sample.speed), Number.POSITIVE_INFINITY);
@@ -531,9 +534,9 @@
     }
 
     const chunkStats = getChunkAverages();
-    if (chunkStats.avgDuration && chunkStats.avgDuration < 0.8 && state.chunkMB < currentMaxChunkMB()) {
-      adjustChunk(CONFIG.chunkStepMB, "chunks finishing fast");
-    } else if (chunkStats.avgDuration && chunkStats.avgDuration > 8 && state.chunkMB > state.limits.minChunkMB) {
+    if (chunkStats.avgDuration && chunkStats.avgDuration < 0.5 && state.chunkMB < currentMaxChunkMB()) {
+      adjustChunk(CONFIG.chunkStepMB * 2, "chunks finishing fast");
+    } else if (chunkStats.avgDuration && chunkStats.avgDuration > 6 && state.chunkMB > state.limits.minChunkMB) {
       adjustChunk(-CONFIG.chunkStepMB, "chunks dragging");
     }
   }
@@ -686,13 +689,13 @@
   }
 
   function currentMaxWorkers() {
-    const tailnetFlex = state.pi.available ? 6 : 0;
+    const tailnetFlex = state.pi.available ? 12 : 0;
     const burstAllowance = state.burst.active ? CONFIG.burstExtraWorkers : 0;
     return Math.min(state.limits.maxWorkers + tailnetFlex + burstAllowance, CONFIG.absoluteWorkerCap);
   }
 
   function currentMaxChunkMB() {
-    const tailnetFlex = state.pi.available ? 64 : 0;
+    const tailnetFlex = state.pi.available ? 128 : 0;
     const burstAllowance = state.burst.active ? CONFIG.burstChunkBoost : 0;
     return Math.min(state.limits.maxChunkMB + tailnetFlex + burstAllowance, CONFIG.absoluteChunkCap);
   }
@@ -715,8 +718,8 @@
     state.burst.active = true;
     state.burst.until = now + CONFIG.burstDuration;
     state.burst.lastTriggered = now;
-    state.workerTarget = clamp(state.workerTarget + 4, state.limits.minWorkers, currentMaxWorkers());
-    state.chunkMB = clamp(state.chunkMB + CONFIG.chunkStepMB, state.limits.minChunkMB, currentMaxChunkMB());
+    state.workerTarget = clamp(state.workerTarget + 8, state.limits.minWorkers, currentMaxWorkers());
+    state.chunkMB = clamp(state.chunkMB + CONFIG.chunkStepMB * 2, state.limits.minChunkMB, currentMaxChunkMB());
     logEvent(`Burst mode engaged (${reason})`);
     maintainWorkers();
     return true;
@@ -731,7 +734,7 @@
       const downlink = connection.downlink || connection.bandwidth;
       if (!downlink) return;
       state.connectionDownlink = downlink;
-      const suggested = clamp(Math.round(downlink * 3), state.limits.minWorkers, currentMaxWorkers());
+      const suggested = clamp(Math.round(downlink * 5), state.limits.minWorkers, currentMaxWorkers());
       if (suggested > state.workerTarget) {
         state.workerTarget = suggested;
         if (state.running) {
@@ -793,7 +796,7 @@
         url: `${PI_BASE}${file.path}`,
         sizeBytes: file.sizeBytes,
         supportsRange: Boolean(meta.supportsRange),
-        weight: 6,
+        weight: 8,
         tailnet: true
       };
       registerSource(sourceDef);
