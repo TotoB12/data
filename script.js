@@ -4,7 +4,7 @@
   const KB = 1024;
   const MB = KB * KB;
   const GB = MB * KB;
-  const PI_BASE = "https://pi1.tahr-vibe.ts.net";
+  const PI_BASE = "https://data.tahr-vibe.ts.net";
 
   const STATIC_SOURCES = [
     {
