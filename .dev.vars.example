@@ -1,0 +1,6 @@
+# Copy to .dev.vars. Local email binding writes mail to .wrangler, never sends it.
+BETTER_AUTH_SECRET=replace-with-at-least-32-random-characters
+RECEIPT_SECRET=replace-with-a-different-32-character-random-secret
+OTP_SECRET=replace-with-another-32-character-random-secret
+# Cloudflare's official always-pass local test key; use a real key in production.
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA

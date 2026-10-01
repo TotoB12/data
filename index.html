@@ -39,6 +39,18 @@
       <p class="subhead">Spin up aggressive fetch streams to stress-test any data plan. Keep the browser foregrounded and stay on power for the fastest drain.</p>
     </header>
 
+    <section class="panel account-panel" aria-label="Your account">
+      <div class="account-row">
+        <div><p class="eyebrow">Your account</p><h2 id="accountName">Play as a guest</h2></div>
+        <button type="button" class="ghost-button" id="openLogin">Sign in with email</button>
+      </div>
+      <div class="account-row">
+        <p class="accepted-label">Accepted total <strong id="acceptedTotal">0.000 GiB</strong></p>
+        <label class="mode-choice"><input type="checkbox" id="rankedMode" /> Ranked downloads</label>
+      </div>
+      <p class="hint" id="accountNotice" aria-live="polite">Guest mode downloads directly from the existing sources.</p>
+    </section>
+
     <section class="panel toggle-panel">
       <div class="toggle-wrapper">
         <label class="switch" for="toggleButton">
@@ -69,26 +81,26 @@
         <div class="status-chip" id="status">Idle</div>
       </div>
       <div class="hint-row">
-        <p class="hint">The counter below tracks encoded payload bytes so onboard usage dashboards match what you see here.</p>
+        <p class="hint">The counter tracks received payload. Accepted account totals are shown separately.</p>
         <button type="button" class="ghost-button" id="resetStats">Reset counters</button>
       </div>
     </section>
 
     <section class="panel stats-grid" aria-live="polite">
       <article class="stat-card">
-        <p class="label">Verified data transfer</p>
-        <p class="value" id="downloadedSize">0.000 GB</p>
-        <p class="detail">Counts encoded bytes from the network layer.</p>
+        <p class="label">Received this session</p>
+        <p class="value" id="downloadedSize">0.000 GiB</p>
+        <p class="detail">Payload bytes read by this browser.</p>
       </article>
       <article class="stat-card">
         <p class="label">Current speed</p>
-        <p class="value" id="downloadSpeed">0.00 MB/s</p>
-        <p class="detail" id="peakSpeed">Peak 0.00 MB/s</p>
+        <p class="value" id="downloadSpeed">0.00 MiB/s</p>
+        <p class="detail" id="peakSpeed">Peak 0.00 MiB/s</p>
       </article>
       <article class="stat-card">
         <p class="label">Active streams</p>
         <p class="value" id="workerCount">0 / 0</p>
-        <p class="detail">Chunk size <span id="chunkSize">0 MB</span></p>
+        <p class="detail">Chunk size <span id="chunkSize">0 MiB</span></p>
       </article>
       <article class="stat-card">
         <p class="label">Session time</p>
@@ -108,6 +120,15 @@
       </div>
     </section>
 
+    <details class="panel" id="leaderboards">
+      <summary>Leaderboard</summary>
+      <div class="board-controls"><label for="leaderboardPeriod">Period</label>
+        <select id="leaderboardPeriod"><option value="daily">Today</option><option value="weekly">This week</option><option value="monthly">This month</option><option value="allTime">All time</option></select>
+      </div>
+      <table class="leaderboard-table"><thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Accepted data</th></tr></thead><tbody id="leaderboardRows"></tbody></table>
+      <p class="hint" id="boardStatus" aria-live="polite">Open to load the four leaderboards.</p>
+    </details>
+
     <section class="panel log-panel">
       <div class="log-header">
         <h2>Activity log</h2>
@@ -117,10 +138,35 @@
     </section>
 
     <footer class="footer">
-      <p>Tip: disable Auto-Lock, Low Data Mode, and any VPN compression for the most accurate burn measurements.</p>
+      <p>Keep the browser foregrounded for the fastest downloads. Payload totals do not measure carrier billing or transport overhead.</p>
     </footer>
   </main>
 
+  <dialog id="loginDialog" class="account-dialog">
+    <div class="account-row"><h2>Your Data account</h2><button type="button" class="ghost-button" id="closeLogin" aria-label="Close account dialog">Close</button></div>
+    <div id="loginEmailStep">
+      <p class="hint">We’ll email a six-digit sign-in code. No password needed.</p>
+      <form id="emailForm"><label for="emailInput">Email address</label><input id="emailInput" type="email" autocomplete="email" required maxlength="254" />
+        <div id="turnstileWidget"></div><button type="submit" class="primary-button" id="sendCode">Send sign-in code</button>
+      </form>
+    </div>
+    <div id="loginCodeStep" hidden>
+      <p class="hint" id="codeDestination"></p>
+      <form id="codeForm"><label for="codeInput">Sign-in code</label><input id="codeInput" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required />
+        <button type="submit" class="primary-button" id="verifyCode">Sign in</button>
+      </form>
+      <button type="button" class="ghost-button" id="differentEmail">Use another email</button>
+    </div>
+    <div id="accountActions" hidden>
+      <form id="aliasForm"><label for="aliasInput">Public display name</label><input id="aliasInput" pattern="[A-Za-z0-9_-]{3,24}" minlength="3" maxlength="24" required />
+        <p class="hint">3–24 letters, numbers, underscores or hyphens. Your email stays private.</p>
+        <button type="submit" class="primary-button" id="saveAlias">Save name</button>
+      </form>
+      <button type="button" class="ghost-button" id="signOut">Sign out</button>
+    </div>
+    <p id="loginError" class="form-message" aria-live="polite"></p>
+  </dialog>
+  <script src="accounts.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

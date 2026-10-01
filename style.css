@@ -10,6 +10,31 @@
   --log-warn: #ffb84d;
 }
 
+[hidden] { display: none !important; }
+.account-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.account-panel h2 { margin: .4rem 0; font-size: 1.3rem; }
+.account-panel .eyebrow { letter-spacing: .2em; }
+.accepted-label { color: var(--muted); }
+.accepted-label strong { display: inline-block; color: var(--text); margin-left: .65rem; font-variant-numeric: tabular-nums; }
+.mode-choice { display: flex; align-items: center; gap: .6rem; font-size: .95rem; }
+input[type="checkbox"] { accent-color: var(--accent); }
+.account-dialog { color: var(--text); background: #111c17; border: 1px solid #34493b; border-radius: 20px; padding: 1.5rem; width: min(460px, calc(100% - 2rem)); }
+.account-dialog::backdrop { background: rgba(0, 0, 0, .75); }
+.account-dialog h2 { margin: 0; font-size: 1.2rem; }
+.account-dialog form { display: grid; gap: .8rem; margin: 1rem 0; }
+.account-dialog input, .board-controls select { background: #080e0b; color: var(--text); border: 1px solid #47554c; border-radius: 9px; padding: .8rem; font: inherit; min-width: 0; }
+.account-dialog input:focus, .board-controls select:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+.primary-button { background: #008b3d; color: #fff; border: 1px solid #18a55a; border-radius: 999px; padding: .75rem 1rem; font: inherit; cursor: pointer; }
+button:disabled, input:disabled { opacity: .55; cursor: default; }
+.form-message { color: #f0cba4; font-size: .9rem; min-height: 1.1rem; }
+.board-controls { display: flex; align-items: center; gap: 1rem; margin: 1.2rem 0; }
+#leaderboards summary { cursor: pointer; font-size: 1.15rem; font-weight: 600; }
+.leaderboard-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.leaderboard-table th, .leaderboard-table td { text-align: left; padding: .75rem .3rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.leaderboard-table th { color: var(--muted); font-weight: 400; }
+.leaderboard-table th:last-child, .leaderboard-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 500px) { .account-dialog { padding: 1rem; } .account-panel { padding: 1.1rem; } .accepted-label strong { margin-left: .35rem; } }
+
 * {
   box-sizing: border-box;
 }

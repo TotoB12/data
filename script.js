@@ -47,6 +47,7 @@
     worker.addEventListener("message", event => {
       const { type, payload } = event.data || {};
       if (type === "stats") {
+        if (window.dataAccount?.isRanked()) return;
         renderStats(payload);
       } else if (type === "log") {
         logEvent(payload.message, payload.tone);
@@ -64,8 +65,16 @@
 
   ui.toggleButton?.addEventListener("change", () => {
     running = ui.toggleButton.checked;
+    if (window.dataAccount?.isRanked()) {
+      post("stop");
+      window.dispatchEvent(new CustomEvent("data:ranked-toggle", { detail: { running } }));
+      return;
+    }
     post(running ? "start" : "stop");
   });
+
+  window.addEventListener("data:stop-direct", () => post("stop"));
+  window.addEventListener("data:ranked-stats", event => { if (window.dataAccount?.isRanked()) renderStats(event.detail); });
 
   ui.aggressionSlider?.addEventListener("input", event => {
     const preset = AGGRESSION_PRESETS[Number(event.target.value)] || AGGRESSION_PRESETS[0];

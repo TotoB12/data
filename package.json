@@ -1,0 +1,38 @@
+{
+  "name": "data-flood-console",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "assets": "node scripts/assets.mjs",
+    "predev": "npm run assets && wrangler d1 migrations apply DB --local",
+    "dev": "wrangler dev",
+    "types": "wrangler types --env-interface CloudflareBindings --strict-vars=false --include-runtime=false",
+    "check": "tsc --noEmit && node --check accounts.js && node --check ranked-worker.js && node --check script.js && node --check flood-worker.js",
+    "test": "vitest run && node --test tests/counter.test.mjs tests/bootstrap.test.mjs",
+    "build": "npm run assets && wrangler deploy --dry-run --outdir .output/worker",
+    "setup": "node scripts/bootstrap.mjs",
+    "deploy": "node scripts/bootstrap.mjs --deploy",
+    "benchmark": "node scripts/benchmark.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "better-auth": "1.7.7"
+  },
+  "overrides": {
+    "undici": "^7.29.1",
+    "sharp": "^0.35.4"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.3.4",
+    "@cloudflare/workers-types": "5.20261001.1",
+    "@playwright/test": "1.63.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "wrangler": "4.145.0",
+    "ws": "8.22.0"
+  }
+}

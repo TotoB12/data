@@ -1,2 +1,13 @@
+node_modules/
 compose.cjs
 formatted_output.txt
+.wrangler/
+.output/
+.deploy/
+.dev.vars
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+benchmark-results*.json
