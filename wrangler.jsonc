@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "data-accounts",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".output/public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "data-accounts",
+    "database_id": "00000000-0000-0000-0000-000000000000",
+    "migrations_dir": "migrations"
+  }],
+  "send_email": [{ "name": "EMAIL" }],
+  "limits": { "cpu_ms": 30000 },
+  "observability": { "enabled": true, "head_sampling_rate": 0.01 },
+  "vars": {
+    "APP_ORIGIN": "http://localhost:8787",
+    "EMAIL_FROM": "login@example.com",
+    "TURNSTILE_SITE_KEY": "",
+    "RANKED_ENABLED": "false",
+    "MAX_RUN_BYTES": "1073741824",
+    "MAX_RUN_SECONDS": "600",
+    "MONTHLY_BYTE_BUDGET": "107374182400",
+    "DAILY_USER_BYTE_BUDGET": "10737418240",
+    "DAILY_EMAIL_BUDGET": "100",
+    "UPSTREAM_CONCURRENCY": "2"
+  }
+}

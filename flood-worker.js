@@ -344,29 +344,26 @@ async function downloadChunk(worker, signal, descriptor) {
 
   const reader = response.body?.getReader();
   let logicalBytes = 0;
-  if (reader) {
-    while (state.running && !worker.retiring) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        logicalBytes += value.byteLength;
+  try {
+    if (reader) {
+      while (state.running && !worker.retiring) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) logicalBytes += value.byteLength;
       }
+    } else {
+      const buffer = await response.arrayBuffer();
+      logicalBytes = buffer.byteLength;
     }
-  } else {
-    const buffer = await response.arrayBuffer();
-    logicalBytes = buffer.byteLength;
+  } finally {
+    await reader?.cancel().catch(() => {});
+    if (logicalBytes > 0) recordChunkStats({
+      encodedBytes: logicalBytes,
+      logicalBytes,
+      duration: (performance.now() - startStamp) / 1000,
+      sourceId: descriptor.source.id
+    });
   }
-
-  const encodedHeader = Number(response.headers.get("content-length"));
-  const encodedBytes = Number.isFinite(encodedHeader) && encodedHeader > 0 ? encodedHeader : logicalBytes;
-  const duration = (performance.now() - startStamp) / 1000;
-
-  recordChunkStats({
-    encodedBytes,
-    logicalBytes,
-    duration,
-    sourceId: descriptor.source.id
-  });
 }
 
 function buildRequestDescriptor() {
@@ -581,7 +578,7 @@ function adjustChunk(delta, reason) {
   const next = clamp(state.chunkMB + delta, state.limits.minChunkMB, currentMaxChunkMB());
   if (next === state.chunkMB) return;
   state.chunkMB = next;
-  logEvent(`Chunk size -> ${state.chunkMB} MB${reason ? ` (${reason})` : ""}`);
+  logEvent(`Chunk size -> ${state.chunkMB} MiB${reason ? ` (${reason})` : ""}`);
   postStats();
 }
 
@@ -724,7 +721,7 @@ function buildSourceSummaryText() {
   const parts = stats.map(entry => {
     const source = SOURCE_LOOKUP[entry.id];
     const gb = entry.bytes / GB;
-    return `${source?.label || entry.id} (${gb.toFixed(2)} GB)`;
+    return `${source?.label || entry.id} (${gb.toFixed(2)} GiB)`;
   });
   return parts.join(" / ");
 }
@@ -739,12 +736,12 @@ function postStats() {
   postMessage({
     type: "stats",
     payload: {
-      downloadedSize: `${(state.totalNetworkBytes / GB).toFixed(3)} GB`,
-      downloadSpeed: `${state.lastComputedSpeed.toFixed(2)} MB/s`,
-      peakSpeed: `Peak ${state.peakSpeed.toFixed(2)} MB/s`,
+      downloadedSize: `${(state.totalNetworkBytes / GB).toFixed(3)} GiB`,
+      downloadSpeed: `${state.lastComputedSpeed.toFixed(2)} MiB/s`,
+      peakSpeed: `Peak ${state.peakSpeed.toFixed(2)} MiB/s`,
       sessionDuration: formatDuration(activeMillis),
       workerCount: `${activeCount} / ${state.workerTarget}${burstSuffix}`,
-      chunkSize: `${state.chunkMB} MB`,
+      chunkSize: `${state.chunkMB} MiB`,
       sourceSummary: buildSourceSummaryText(),
       statusText: state.statusText,
       statusState
