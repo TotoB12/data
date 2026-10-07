@@ -300,9 +300,13 @@ def verify_readback(operation, after, before):
         okay = isinstance(after, list) and len(after) == len(desired)
         if okay:
             for actual, want in zip(after, desired):
-                # Newly created rule IDs are assigned by Cloudflare.
-                okay = okay and isinstance(actual, dict) and {
-                    k: v for k, v in actual.items() if k != 'id' or 'id' in want} == want
+                # Only the exact owned marker may regenerate an existing ID on PUT.
+                owned = want.get('description') == 'bella_speedtest_connector'
+                ignore_id = owned or 'id' not in want
+                okay = okay and isinstance(actual, dict) and (
+                    not owned or (isinstance(actual.get('id'), str) and bool(actual['id']))) and {
+                    k: v for k, v in actual.items() if k != 'id' or not ignore_id} == {
+                    k: v for k, v in want.items() if k != 'id' or not ignore_id}
     elif check in ('rule', 'ruleset'):
         rules = (after or {}).get('rules', [])
         wanted = desired if check == 'ruleset' else [desired]

@@ -188,6 +188,88 @@ class CorsAndPreflightTests(unittest.TestCase):
         self.assertNotIn('OPTIONS', rendered['phases']['http_request_cache_settings'][0]['expression'])
 
 
+class ConnectorReadbackTests(unittest.TestCase):
+    def desired(self):
+        owned = dict(ops.render_rules()['connector'], id='b14c252ed97a44d593209952f03dd064')
+        unrelated = dict(owned, id='keep-id', description='unrelated', expression='false',
+                         parameters={'host': 'other.example'})
+        unknown = dict(unrelated, id='unknown-id', description='bella_speedtest_connector_other')
+        return [unrelated, owned, unknown]
+
+    def verify(self, desired, actual):
+        deploy.verify_readback({'check': 'connectors', 'desired': desired}, actual, desired)
+
+    def test_owned_put_regenerates_id_on_disable_and_restore(self):
+        desired = self.desired()
+        for enabled, assigned in [(False, 'fb0e1e7910054f578dfce99badb33eed'),
+                                  (True, '25f74eeede2a455a947014f7a946e6d8')]:
+            with self.subTest(enabled=enabled):
+                desired[1]['enabled'] = enabled
+                actual = copy.deepcopy(desired)
+                actual[1]['id'] = assigned
+                self.verify(desired, actual)
+                desired = actual
+
+    def test_owned_assigned_id_must_be_nonempty_string(self):
+        for existing in (False, True):
+            desired = self.desired()
+            if not existing:
+                del desired[1]['id']
+            for assigned in (None, '', 123, False, []):
+                with self.subTest(existing=existing, assigned=assigned):
+                    actual = copy.deepcopy(desired)
+                    actual[1]['id'] = assigned
+                    with self.assertRaises(ValueError):
+                        self.verify(desired, actual)
+            actual = copy.deepcopy(desired)
+            actual[1].pop('id', None)
+            with self.subTest(existing=existing, assigned='missing'), self.assertRaises(ValueError):
+                self.verify(desired, actual)
+
+    def test_nonowned_and_unknown_marker_ids_remain_exact(self):
+        desired = self.desired()
+        for index in (0, 2):
+            for assigned in ('regenerated', None):
+                with self.subTest(index=index, assigned=assigned):
+                    actual = copy.deepcopy(desired)
+                    if assigned is None:
+                        del actual[index]['id']
+                    else:
+                        actual[index]['id'] = assigned
+                    with self.assertRaises(ValueError):
+                        self.verify(desired, actual)
+
+    def test_all_config_including_unknown_writable_fields_remains_exact(self):
+        desired = self.desired()
+        desired[1]['unknownWritable'] = {'keep': True}
+        actual = copy.deepcopy(desired)
+        self.verify(desired, actual)
+        for key, value in [('enabled', False), ('description', 'bella_speedtest_connector_other'),
+                           ('expression', 'false'), ('provider', 'aws_s3'),
+                           ('parameters', {'host': 'other.example'}),
+                           ('unknownWritable', {'keep': False}), ('extraWritable', True)]:
+            with self.subTest(key=key):
+                actual = copy.deepcopy(desired)
+                actual[1][key] = value
+                with self.assertRaises(ValueError):
+                    self.verify(desired, actual)
+        for index, rule in enumerate(desired):
+            for key in rule.keys() - {'id'}:
+                with self.subTest(index=index, missing=key):
+                    actual = copy.deepcopy(desired)
+                    del actual[index][key]
+                    with self.assertRaises(ValueError):
+                        self.verify(desired, actual)
+
+    def test_full_array_length_order_and_rule_shape_remain_exact(self):
+        desired = self.desired()
+        for actual in (None, {}, desired[:-1], desired + [desired[0]],
+                       list(reversed(desired)), [desired[1], desired[0], desired[2]],
+                       [desired[0], None, desired[2]]):
+            with self.subTest(actual=actual), self.assertRaises(ValueError):
+                self.verify(desired, actual)
+
+
 class SslOrderingTests(unittest.TestCase):
     def state(self, later):
         state = test_contract.DeploymentTests().snapshot()
