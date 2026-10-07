@@ -33,78 +33,19 @@ const KB = 1024;
 const MB = KB * KB;
 const GB = MB * KB;
 
-// Sources carry a `mode`:
-//   "exact" - server returns precisely the `bytes` you ask for (no size ceiling,
-//             no Range gymnastics). Best fit for this app; used for endpoints
-//             actually built for bandwidth testing.
-//   "range" - fixed-size file, sliced with a Range header at a random offset.
-//   "whole" - fixed-size file with no Range support; downloaded in full each time.
-//
-// 2026 update: widened from 2 real origins (Cloudflare + one Hetzner mirror) to
-// 7, by adding Hetzner's per-datacenter speedtest mirrors (Falkenstein, Nuremberg,
-// Helsinki, Ashburn, Singapore - confirmed to exist as distinct hostnames via
-// Hetzner's own DNS records; if a region's file path ever differs from the
-// speed.hetzner.de convention, the existing failure-backoff below quarantines
-// and then permanently drops it after a few misses, so a wrong URL degrades
-// gracefully instead of breaking anything). This matters because browsers cap
-// concurrent connections *per origin* - at 40-90 workers against 1-2 origins,
-// origin/connection ceilings bite before bandwidth does. More independent
-// origins gives the existing performance-weighted picker more real capacity to
-// actually spread across.
-function hetznerMirror(id, label, host, weight) {
-  return {
-    id,
-    label,
-    url: `https://${host}/1GB.bin`,
-    sizeBytes: 1073741824,
-    supportsRange: true,
-    mode: "range",
-    weight,
-    tier: "primary",
-    // Unverified from here - I don't have live network access to these hosts
-    // to hand-check CORS headers before shipping. Doesn't matter: every
-    // source now self-disables after a run of consecutive failures (see
-    // recordSourceFailure), so a source that can't actually be read
-    // cross-origin quietly drops out of the pool within its first minute
-    // instead of being retried forever.
-    corsUnverified: true
-  };
-}
-
+// Only these positive decimal-byte fixtures are routed by our endpoint.
+const DOWNLOAD_ENDPOINT = "https://data.totob12.com/__down";
+const DOWNLOAD_SIZES = [100000, 1000000, 10000000, 25000000, 100000000, 250000000];
 const STATIC_SOURCES = [
-  // --- Endpoints actually built to be hammered for bandwidth testing ---
   {
-    id: "cf-speedtest",
-    label: "Cloudflare speed test",
-    url: "https://speed.cloudflare.com/__down",
+    id: "own-speedtest",
+    label: "TotoB12 speed test",
+    url: DOWNLOAD_ENDPOINT,
     mode: "exact",
-    maxRequestBytes: 100 * MB, // matches Cloudflare's own speedtest tool's chunk ceiling
+    maxRequestBytes: 250000000,
     weight: 5,
     tier: "primary"
-  },
-  {
-    id: "hetzner-de",
-    label: "Hetzner speedtest mirror",
-    url: "https://speed.hetzner.de/1GB.bin",
-    sizeBytes: 1073741824,
-    supportsRange: true,
-    mode: "range",
-    weight: 3,
-    tier: "primary",
-    corsUnverified: true
-  },
-  hetznerMirror("hetzner-fsn1", "Hetzner speedtest (Falkenstein)", "fsn1-speed.hetzner.com", 3),
-  hetznerMirror("hetzner-nbg1", "Hetzner speedtest (Nuremberg)", "nbg1-speed.hetzner.com", 3),
-  hetznerMirror("hetzner-hel1", "Hetzner speedtest (Helsinki)", "hel1-speed.hetzner.com", 2.5),
-  hetznerMirror("hetzner-ash", "Hetzner speedtest (Ashburn, US)", "ash-speed.hetzner.com", 2),
-  hetznerMirror("hetzner-sin", "Hetzner speedtest (Singapore)", "sin-speed.hetzner.com", 1.5)
-  // 2026 update: dropped the jsDelivr "last resort" fallback. It only ever
-  // fired if every real source was quarantined at once, which was already
-  // unlikely with 2 origins and is far less likely now with 7 independent
-  // ones - and jsDelivr is a package CDN, not a bandwidth-test endpoint, so
-  // leaning on it even as a rare last resort wasn't a great trade. If every
-  // source above is ever simultaneously disabled, pickSource() now just
-  // falls back to the first registered source rather than a dedicated one.
+  }
 ];
 
 const SOURCE_LOOKUP = {};
@@ -328,7 +269,10 @@ async function runWorker(worker) {
 async function downloadChunk(worker, signal, descriptor) {
   const startStamp = performance.now();
   const response = await fetch(descriptor.url, {
+    method: "GET",
     cache: "no-store",
+    redirect: "error",
+    credentials: "omit",
     mode: "cors",
     signal,
     headers: descriptor.headers,
@@ -338,8 +282,11 @@ async function downloadChunk(worker, signal, descriptor) {
     priority: "high"
   });
 
-  if (!response.ok && response.status !== 206) {
-    throw new Error(`HTTP ${response.status}`);
+  if (response.status !== 200 || response.redirected || response.url !== descriptor.url ||
+      response.headers.get("content-type") !== "application/octet-stream" ||
+      response.headers.get("content-length") !== String(descriptor.chunkBytes) ||
+      response.headers.get("content-encoding") !== null) {
+    throw new Error(`Invalid download response (HTTP ${response.status})`);
   }
 
   const reader = response.body?.getReader();
@@ -371,28 +318,15 @@ async function downloadChunk(worker, signal, descriptor) {
 
 function buildRequestDescriptor() {
   const source = pickSource();
-  const headers = {};
-  let chunkBytes;
-
-  if (source.mode === "exact") {
-    chunkBytes = Math.min(state.chunkMB * MB, source.maxRequestBytes || Infinity);
-  } else if (source.mode === "range" && source.sizeBytes) {
-    chunkBytes = Math.min(state.chunkMB * MB, source.sizeBytes);
-    const maxStart = Math.max(source.sizeBytes - chunkBytes - 1, 0);
-    const start = Math.floor(Math.random() * (maxStart || 1));
-    const end = Math.min(source.sizeBytes - 1, start + chunkBytes - 1);
-    headers.Range = `bytes=${start}-${end}`;
-  } else {
-    chunkBytes = source.sizeBytes || state.chunkMB * MB; // whole-file mode
+  // Preset/tuner targets use legacy MiB; endpoint fixtures use decimal bytes.
+  if (source.url !== DOWNLOAD_ENDPOINT || typeof state.chunkMB !== "number" ||
+      !Number.isFinite(state.chunkMB) || state.chunkMB <= 0) {
+    throw new Error("Invalid download request");
   }
-
-  const cacheBust = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  const sep = source.url.includes("?") ? "&" : "?";
-  let url = `${source.url}${sep}cb=${cacheBust}`;
-  if (source.mode === "exact") {
-    url += `&bytes=${Math.round(chunkBytes)}`;
-  }
-  return { source, url, headers };
+  const desiredBytes = Math.min(state.chunkMB * MB, source.maxRequestBytes);
+  const chunkBytes = DOWNLOAD_SIZES.find(size => size >= desiredBytes);
+  const url = `${DOWNLOAD_ENDPOINT}?bytes=${chunkBytes}`;
+  return { source, url, headers: {}, chunkBytes };
 }
 
 function pickSource() {

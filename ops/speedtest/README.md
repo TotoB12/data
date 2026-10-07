@@ -1,6 +1,6 @@
 # Download-only speedtest endpoint operations
 
-This directory is **operational tooling**, not a published speedtest UI or app integration. Existing site bytes, `.gitignore`, Pages settings, and the `data.totob12.com` → `data-bqs.pages.dev` mapping must stay unchanged. A GitHub merge may trigger the existing automatic Pages deployment, but this change does not alter the app. Do not publish fixtures, credentials, reports, or a client harness through Pages.
+This directory contains **operational tooling and offline tests**. The existing Data Flood Console now downloads exclusively through its own fixed-size `https://data.totob12.com/__down` endpoint; only its worker's endpoint compatibility changes. Design, controls, presets, adaptive tuning, counters and display formats remain unchanged. `.gitignore`, Pages settings, and the `data.totob12.com` → `data-bqs.pages.dev` mapping remain unchanged. A GitHub merge may trigger the existing automatic Pages deployment. Do not publish fixtures, credentials, reports, or a client harness through Pages.
 
 ## Fixed contract
 
@@ -28,12 +28,20 @@ python -m unittest discover -s ops/speedtest/tests -v
 python ops/speedtest/speedtest_ops.py --check
 node --check ops/speedtest/examples/download-only-config.mjs
 node ops/speedtest/tests/test_example.mjs
+node --check flood-worker.js
+node --test ops/speedtest/tests/test_flood_client.mjs
 python ops/speedtest/deploy.py --dry-run --offline
 python ops/speedtest/verify.py --plan
 python ops/speedtest/verify.py --plan --mode full --allow-large --budget-bytes 1400000000
 ```
 
 To deliberately regenerate the checked-in payload, redirect the renderer output to `ops/speedtest/cloudflare-rules.json`, then run `--check` and tests. The Python matcher and mock transports are **contract models, not Cloudflare expression validation, live API compatibility, routing or normalization proof**. Raw-field availability, rule quotas, plan entitlements, actual API canonicalization and cache behavior must be checked on the real account by the deploying operator. A documentation-compatible payload is not evidence it was accepted.
+
+## Existing console integration
+
+`flood-worker.js` has one download source, `https://data.totob12.com/__down`. It converts the existing internal MiB target to the smallest supported positive decimal-byte fixture at or above that target, capped at 250,000,000 bytes. Requests are literal `GET ?bytes=N`, with no cachebuster, extra query or Range; browser cache is `no-store`, credentials are omitted and redirects are refused. Before reading, the worker requires HTTP 200, the exact requested URL, `application/octet-stream`, the matching literal Content-Length and absent Content-Encoding, so unsupported-query Pages HTML is not accepted.
+
+The page still starts only through its existing toggle. No SDK, upload, logging backend, production harness or new controls are added. Original counters, reset/stop/restart handling, source backoff/fallback behavior and displayed units/target chunk size are deliberately unchanged: internal `MB`/`GB` conversions remain binary (MiB/GiB), while endpoint sizes are decimal bytes. The displayed target is not necessarily the selected fixture size, and existing header-based accounting is not packet-level usage measurement. Offline VM tests cover endpoint compatibility and preserve these legacy behaviors; they do not prove live routing or browser behavior.
 
 ## Generate fixtures privately
 
@@ -162,7 +170,7 @@ Rollback should **disable only the created owned rules and connector**, preservi
 
 ## Download-only client example
 
-`examples/download-only-config.mjs` is for **`@cloudflare/speedtest@1.14.1`**. It exports config only and makes no requests. Explicit `autoStart: false`; result/measurement logging disabled; authorization disabled; `estimatedServerTime: 0`; download loaded latency on and upload loaded latency off. It keeps initial 2 and 20 latency packets (around the bypass warm-up), 2-packet gaps, and positive download rounds: 100,000×1 bypass + 9, 1,000,000×8, 10,000,000×6, 25,000,000×4, 100,000,000×3, 250,000,000×2. No upload, packet-loss, TURN, RPKI or externally logged measurements. Pin the package exactly if integrating later. No UI/harness is part of this deployment; browser integration needs separate review/consent.
+`examples/download-only-config.mjs` is for **`@cloudflare/speedtest@1.14.1`**. It exports config only and makes no requests. Explicit `autoStart: false`; result/measurement logging disabled; authorization disabled; `estimatedServerTime: 0`; download loaded latency on and upload loaded latency off. It keeps initial 2 and 20 latency packets (around the bypass warm-up), 2-packet gaps, and positive download rounds: 100,000×1 bypass + 9, 1,000,000×8, 10,000,000×6, 25,000,000×4, 100,000,000×3, 250,000,000×2. No upload, packet-loss, TURN, RPKI or externally logged measurements. Pin the package exactly if integrating this separate example later; the existing console integration above does not use this SDK. The example adds no UI/harness; live browser verification still needs separate review/consent.
 
 The SDK merges omitted options over its defaults and requires a truthy upload URL even for download/latency engines. The example explicitly replaces upload/TURN-credential URLs and TURN/RPKI hosts with reserved `disabled.invalid` placeholders, with null TURN username/password; it never leaves the default external service targets configured. The approved schedule never uses these placeholders: they are not a network sandbox if someone later adds unsupported measurements. To verify the fully merged config and truthy-URL compatibility offline, optionally pass an already cached **official 1.14.1** `dist/speedtest.js` path to `node ops/speedtest/tests/test_example.mjs /absolute/cached/package/dist/speedtest.js`. That check mocks fetch before SDK import and exercises one latency request; no install, account request or real network transport is performed.
 

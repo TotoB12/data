@@ -3,10 +3,12 @@ on:
   push:
     paths:
       - 'ops/speedtest/**'
+      - 'flood-worker.js'
       - '.github/workflows/speedtest-contract.yml'
   pull_request:
     paths:
       - 'ops/speedtest/**'
+      - 'flood-worker.js'
       - '.github/workflows/speedtest-contract.yml'
 permissions:
   contents: read
@@ -30,6 +32,10 @@ jobs:
         run: |
           node --check ops/speedtest/examples/download-only-config.mjs
           node ops/speedtest/tests/test_example.mjs
+      - name: Offline flood client endpoint compatibility
+        run: |
+          node --check flood-worker.js
+          node --test ops/speedtest/tests/test_flood_client.mjs
       - name: Exercise offline CLI only
         run: |
           python ops/speedtest/deploy.py --dry-run --offline > /dev/null
