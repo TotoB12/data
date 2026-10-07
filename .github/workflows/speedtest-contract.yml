@@ -1,0 +1,36 @@
+name: Speedtest endpoint contract
+on:
+  push:
+    paths:
+      - 'ops/speedtest/**'
+      - '.github/workflows/speedtest-contract.yml'
+  pull_request:
+    paths:
+      - 'ops/speedtest/**'
+      - '.github/workflows/speedtest-contract.yml'
+permissions:
+  contents: read
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Offline unit tests
+        run: python -m unittest discover -s ops/speedtest/tests -v
+      - name: Renderer drift check
+        run: python ops/speedtest/speedtest_ops.py --check
+      - name: Check example syntax and measurement allowlist
+        run: |
+          node --check ops/speedtest/examples/download-only-config.mjs
+          node ops/speedtest/tests/test_example.mjs
+      - name: Exercise offline CLI only
+        run: |
+          python ops/speedtest/deploy.py --dry-run --offline > /dev/null
+          python ops/speedtest/verify.py --plan > /dev/null
