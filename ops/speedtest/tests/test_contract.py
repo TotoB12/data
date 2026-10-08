@@ -17,12 +17,13 @@ import verify
 class ContractTests(unittest.TestCase):
     def test_fixed_contract(self):
         c = ops.load_contract()
-        self.assertEqual(c['sizes'], [0, 100000, 1000000, 10000000, 25000000, 100000000, 250000000])
-        self.assertEqual(sum(c['sizes']), 386100000)
-        self.assertEqual(len(c['queries']), 9)
+        self.assertEqual(c['legacy_sizes'], [0, 100000, 1000000, 10000000, 25000000, 100000000, 250000000])
+        self.assertEqual(c['sizes'], sorted(set(c['legacy_sizes'] + c['client_sizes'])))
+        self.assertEqual(sum(c['sizes']), 1145269024)
+        self.assertEqual(len(c['queries']), 22)
         self.assertEqual(c['queries'][-2:], ['during=idle&bytes=0', 'during=download&bytes=0'])
 
-    def test_literal_model_accepts_only_nine_get_head_and_valid_preflight(self):
+    def test_model_accepts_canonical_get_head_and_valid_preflight(self):
         for method in ('GET', 'HEAD', 'OPTIONS'):
             for query in ops.load_contract()['queries']:
                 headers = {'origin': ['null'], 'access-control-request-method': ['GET']} if method == 'OPTIONS' else None
@@ -32,8 +33,8 @@ class ContractTests(unittest.TestCase):
         for path, query in [('/__DOWN', 'bytes=0'), ('/%5f_down', 'bytes=0'),
                             ('//__down', 'bytes=0'), ('/__down/', 'bytes=0'),
                             ('/__down', 'bytes=00'), ('/__down', 'bytes=%30'),
-                            ('/__down', 'bytes=0&during=idle'), ('/__down', 'bytes=0&bytes=0'),
-                            ('/__down', 'during=IDLE&bytes=0'), ('/__down', 'bytes=0&cb=1'),
+                            ('/__down', 'bytes=100000&during=idle'), ('/__down', 'bytes=0&bytes=0'),
+                            ('/__down', 'during=IDLE&bytes=0'), ('/__down', 'bytes=0&cb='),
                             ('/__down', 'bytes=0&measId=x'), ('/__down', 'Bytes=0')]:
             with self.subTest(path=path, query=query):
                 self.assertIsNone(ops.match_download('data.totob12.com', path, query, 'GET'))
@@ -44,13 +45,14 @@ class ContractTests(unittest.TestCase):
     def test_renderer_exact_rewrites_and_scopes(self):
         r = ops.render_rules()
         rewrites = r['phases']['http_request_transform']
-        self.assertEqual(len(rewrites), 7)
-        self.assertEqual(rewrites[0]['expression'].count('during='), 2)
-        for size, rule in zip(ops.load_contract()['sizes'], rewrites):
-            self.assertEqual(rule['action_parameters']['uri'], {'path': {'value': f'/speedtest/{size}.bin'}, 'query': {'value': ''}})
-            self.assertIn('raw.http.request.uri.path', rule['expression'])
-            self.assertIn('raw.http.request.uri.query', rule['expression'])
-            self.assertIn('"OPTIONS"', rule['expression'])
+        self.assertEqual(len(rewrites), 1)
+        rule = rewrites[0]
+        self.assertEqual(rule['action_parameters']['uri'], {
+            'path': {'expression': 'concat("/speedtest/", http.request.uri.args["bytes"][0], ".bin")'},
+            'query': {'value': ''}})
+        self.assertIn('raw.http.request.uri.path', rule['expression'])
+        self.assertIn('raw.http.request.uri.args', rule['expression'])
+        self.assertIn('"OPTIONS"', rule['expression'])
         self.assertEqual(r['connector']['provider'], 'cloudflare_r2')
         self.assertEqual(r['connector']['parameters']['host'], 'speed-origin.totob12.com')
         cache = r['phases']['http_request_cache_settings'][0]
@@ -124,7 +126,7 @@ class SafetyTests(unittest.TestCase):
         self.assertTrue(any(x.get('expect_html') for x in requests))
         self.assertTrue(any(x['method'] == 'OPTIONS' for x in requests))
         self.assertTrue(any(x['host'] == 'speed-origin.totob12.com' for x in requests))
-        self.assertLessEqual(sum(x['bytes'] for x in verify.exercise_plan('full')), 2000000000)
+        self.assertLessEqual(sum(x['bytes'] for x in verify.exercise_plan('full') if x['method'] == 'GET'), 2000000000)
 
 
 class DeploymentTests(unittest.TestCase):

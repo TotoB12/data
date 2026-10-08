@@ -3,117 +3,15 @@
   "phases": {
     "http_request_transform": [
       {
-        "ref": "bella_speedtest_rewrite_0",
-        "description": "bella_speedtest_rewrite_0",
+        "ref": "bella_speedtest_rewrite",
+        "description": "bella_speedtest_rewrite",
         "enabled": true,
         "action": "rewrite",
-        "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=0\" \"during=idle&bytes=0\" \"during=download&bytes=0\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
+        "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and (len(raw.http.request.uri.args[\"bytes\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] in {\"0\" \"100000\" \"1000000\" \"8388608\" \"10000000\" \"16777216\" \"25000000\" \"25165824\" \"33554432\" \"41943040\" \"50331648\" \"58720256\" \"67108864\" \"75497472\" \"83886080\" \"92274688\" \"100000000\" \"100663296\" \"104857600\" \"250000000\"} and all(raw.http.request.uri.args.names[*] in {\"bytes\" \"cb\" \"during\"}) and (not (len(raw.http.request.uri.args[\"cb\"]) ge 0) or (len(raw.http.request.uri.args[\"cb\"]) eq 1 and len(raw.http.request.uri.args[\"cb\"][0]) gt 0 and len(raw.http.request.uri.args[\"cb\"][0]) le 128)) and (not (len(raw.http.request.uri.args[\"during\"]) ge 0) or (len(raw.http.request.uri.args[\"during\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] eq \"0\" and raw.http.request.uri.args[\"during\"][0] in {\"idle\" \"download\"}))) and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
         "action_parameters": {
           "uri": {
             "path": {
-              "value": "/speedtest/0.bin"
-            },
-            "query": {
-              "value": ""
-            }
-          }
-        }
-      },
-      {
-        "ref": "bella_speedtest_rewrite_100000",
-        "description": "bella_speedtest_rewrite_100000",
-        "enabled": true,
-        "action": "rewrite",
-        "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=100000\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
-        "action_parameters": {
-          "uri": {
-            "path": {
-              "value": "/speedtest/100000.bin"
-            },
-            "query": {
-              "value": ""
-            }
-          }
-        }
-      },
-      {
-        "ref": "bella_speedtest_rewrite_1000000",
-        "description": "bella_speedtest_rewrite_1000000",
-        "enabled": true,
-        "action": "rewrite",
-        "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=1000000\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
-        "action_parameters": {
-          "uri": {
-            "path": {
-              "value": "/speedtest/1000000.bin"
-            },
-            "query": {
-              "value": ""
-            }
-          }
-        }
-      },
-      {
-        "ref": "bella_speedtest_rewrite_10000000",
-        "description": "bella_speedtest_rewrite_10000000",
-        "enabled": true,
-        "action": "rewrite",
-        "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=10000000\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
-        "action_parameters": {
-          "uri": {
-            "path": {
-              "value": "/speedtest/10000000.bin"
-            },
-            "query": {
-              "value": ""
-            }
-          }
-        }
-      },
-      {
-        "ref": "bella_speedtest_rewrite_25000000",
-        "description": "bella_speedtest_rewrite_25000000",
-        "enabled": true,
-        "action": "rewrite",
-        "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=25000000\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
-        "action_parameters": {
-          "uri": {
-            "path": {
-              "value": "/speedtest/25000000.bin"
-            },
-            "query": {
-              "value": ""
-            }
-          }
-        }
-      },
-      {
-        "ref": "bella_speedtest_rewrite_100000000",
-        "description": "bella_speedtest_rewrite_100000000",
-        "enabled": true,
-        "action": "rewrite",
-        "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=100000000\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
-        "action_parameters": {
-          "uri": {
-            "path": {
-              "value": "/speedtest/100000000.bin"
-            },
-            "query": {
-              "value": ""
-            }
-          }
-        }
-      },
-      {
-        "ref": "bella_speedtest_rewrite_250000000",
-        "description": "bella_speedtest_rewrite_250000000",
-        "enabled": true,
-        "action": "rewrite",
-        "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=250000000\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
-        "action_parameters": {
-          "uri": {
-            "path": {
-              "value": "/speedtest/250000000.bin"
+              "expression": "concat(\"/speedtest/\", http.request.uri.args[\"bytes\"][0], \".bin\")"
             },
             "query": {
               "value": ""
@@ -128,7 +26,7 @@
         "description": "bella_speedtest_cache",
         "enabled": true,
         "action": "set_cache_settings",
-        "expression": "((http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=0\" \"bytes=100000\" \"bytes=1000000\" \"bytes=10000000\" \"bytes=25000000\" \"bytes=100000000\" \"bytes=250000000\" \"during=idle&bytes=0\" \"during=download&bytes=0\"} and http.request.method in {\"GET\" \"HEAD\"}) or (http.host eq \"speed-origin.totob12.com\" and raw.http.request.uri.path in {\"/speedtest/0.bin\" \"/speedtest/100000.bin\" \"/speedtest/1000000.bin\" \"/speedtest/10000000.bin\" \"/speedtest/25000000.bin\" \"/speedtest/100000000.bin\" \"/speedtest/250000000.bin\"} and raw.http.request.uri.query eq \"\" and http.request.method in {\"GET\" \"HEAD\"}))",
+        "expression": "((http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and (len(raw.http.request.uri.args[\"bytes\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] in {\"0\" \"100000\" \"1000000\" \"8388608\" \"10000000\" \"16777216\" \"25000000\" \"25165824\" \"33554432\" \"41943040\" \"50331648\" \"58720256\" \"67108864\" \"75497472\" \"83886080\" \"92274688\" \"100000000\" \"100663296\" \"104857600\" \"250000000\"} and all(raw.http.request.uri.args.names[*] in {\"bytes\" \"cb\" \"during\"}) and (not (len(raw.http.request.uri.args[\"cb\"]) ge 0) or (len(raw.http.request.uri.args[\"cb\"]) eq 1 and len(raw.http.request.uri.args[\"cb\"][0]) gt 0 and len(raw.http.request.uri.args[\"cb\"][0]) le 128)) and (not (len(raw.http.request.uri.args[\"during\"]) ge 0) or (len(raw.http.request.uri.args[\"during\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] eq \"0\" and raw.http.request.uri.args[\"during\"][0] in {\"idle\" \"download\"}))) and http.request.method in {\"GET\" \"HEAD\"}) or (http.host eq \"speed-origin.totob12.com\" and raw.http.request.uri.path in {\"/speedtest/0.bin\" \"/speedtest/100000.bin\" \"/speedtest/1000000.bin\" \"/speedtest/8388608.bin\" \"/speedtest/10000000.bin\" \"/speedtest/16777216.bin\" \"/speedtest/25000000.bin\" \"/speedtest/25165824.bin\" \"/speedtest/33554432.bin\" \"/speedtest/41943040.bin\" \"/speedtest/50331648.bin\" \"/speedtest/58720256.bin\" \"/speedtest/67108864.bin\" \"/speedtest/75497472.bin\" \"/speedtest/83886080.bin\" \"/speedtest/92274688.bin\" \"/speedtest/100000000.bin\" \"/speedtest/100663296.bin\" \"/speedtest/104857600.bin\" \"/speedtest/250000000.bin\"} and raw.http.request.uri.query eq \"\" and http.request.method in {\"GET\" \"HEAD\"}))",
         "action_parameters": {
           "cache": true,
           "edge_ttl": {
@@ -165,7 +63,7 @@
         "description": "bella_speedtest_headers",
         "enabled": true,
         "action": "rewrite",
-        "expression": "((http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=0\" \"bytes=100000\" \"bytes=1000000\" \"bytes=10000000\" \"bytes=25000000\" \"bytes=100000000\" \"bytes=250000000\" \"during=idle&bytes=0\" \"during=download&bytes=0\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"}))) or (http.host eq \"speed-origin.totob12.com\" and raw.http.request.uri.path in {\"/speedtest/0.bin\" \"/speedtest/100000.bin\" \"/speedtest/1000000.bin\" \"/speedtest/10000000.bin\" \"/speedtest/25000000.bin\" \"/speedtest/100000000.bin\" \"/speedtest/250000000.bin\"} and raw.http.request.uri.query eq \"\" and http.request.method in {\"GET\" \"HEAD\"}))",
+        "expression": "((http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and (len(raw.http.request.uri.args[\"bytes\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] in {\"0\" \"100000\" \"1000000\" \"8388608\" \"10000000\" \"16777216\" \"25000000\" \"25165824\" \"33554432\" \"41943040\" \"50331648\" \"58720256\" \"67108864\" \"75497472\" \"83886080\" \"92274688\" \"100000000\" \"100663296\" \"104857600\" \"250000000\"} and all(raw.http.request.uri.args.names[*] in {\"bytes\" \"cb\" \"during\"}) and (not (len(raw.http.request.uri.args[\"cb\"]) ge 0) or (len(raw.http.request.uri.args[\"cb\"]) eq 1 and len(raw.http.request.uri.args[\"cb\"][0]) gt 0 and len(raw.http.request.uri.args[\"cb\"][0]) le 128)) and (not (len(raw.http.request.uri.args[\"during\"]) ge 0) or (len(raw.http.request.uri.args[\"during\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] eq \"0\" and raw.http.request.uri.args[\"during\"][0] in {\"idle\" \"download\"}))) and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"}))) or (http.host eq \"speed-origin.totob12.com\" and raw.http.request.uri.path in {\"/speedtest/0.bin\" \"/speedtest/100000.bin\" \"/speedtest/1000000.bin\" \"/speedtest/8388608.bin\" \"/speedtest/10000000.bin\" \"/speedtest/16777216.bin\" \"/speedtest/25000000.bin\" \"/speedtest/25165824.bin\" \"/speedtest/33554432.bin\" \"/speedtest/41943040.bin\" \"/speedtest/50331648.bin\" \"/speedtest/58720256.bin\" \"/speedtest/67108864.bin\" \"/speedtest/75497472.bin\" \"/speedtest/83886080.bin\" \"/speedtest/92274688.bin\" \"/speedtest/100000000.bin\" \"/speedtest/100663296.bin\" \"/speedtest/104857600.bin\" \"/speedtest/250000000.bin\"} and raw.http.request.uri.query eq \"\" and http.request.method in {\"GET\" \"HEAD\"}))",
         "action_parameters": {
           "headers": {
             "cache-control": {
@@ -194,7 +92,7 @@
         "description": "bella_speedtest_compression",
         "enabled": true,
         "action": "compress_response",
-        "expression": "((http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=0\" \"bytes=100000\" \"bytes=1000000\" \"bytes=10000000\" \"bytes=25000000\" \"bytes=100000000\" \"bytes=250000000\" \"during=idle&bytes=0\" \"during=download&bytes=0\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"}))) or (http.host eq \"speed-origin.totob12.com\" and raw.http.request.uri.path in {\"/speedtest/0.bin\" \"/speedtest/100000.bin\" \"/speedtest/1000000.bin\" \"/speedtest/10000000.bin\" \"/speedtest/25000000.bin\" \"/speedtest/100000000.bin\" \"/speedtest/250000000.bin\"} and raw.http.request.uri.query eq \"\" and http.request.method in {\"GET\" \"HEAD\"}))",
+        "expression": "((http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and (len(raw.http.request.uri.args[\"bytes\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] in {\"0\" \"100000\" \"1000000\" \"8388608\" \"10000000\" \"16777216\" \"25000000\" \"25165824\" \"33554432\" \"41943040\" \"50331648\" \"58720256\" \"67108864\" \"75497472\" \"83886080\" \"92274688\" \"100000000\" \"100663296\" \"104857600\" \"250000000\"} and all(raw.http.request.uri.args.names[*] in {\"bytes\" \"cb\" \"during\"}) and (not (len(raw.http.request.uri.args[\"cb\"]) ge 0) or (len(raw.http.request.uri.args[\"cb\"]) eq 1 and len(raw.http.request.uri.args[\"cb\"][0]) gt 0 and len(raw.http.request.uri.args[\"cb\"][0]) le 128)) and (not (len(raw.http.request.uri.args[\"during\"]) ge 0) or (len(raw.http.request.uri.args[\"during\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] eq \"0\" and raw.http.request.uri.args[\"during\"][0] in {\"idle\" \"download\"}))) and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"}))) or (http.host eq \"speed-origin.totob12.com\" and raw.http.request.uri.path in {\"/speedtest/0.bin\" \"/speedtest/100000.bin\" \"/speedtest/1000000.bin\" \"/speedtest/8388608.bin\" \"/speedtest/10000000.bin\" \"/speedtest/16777216.bin\" \"/speedtest/25000000.bin\" \"/speedtest/25165824.bin\" \"/speedtest/33554432.bin\" \"/speedtest/41943040.bin\" \"/speedtest/50331648.bin\" \"/speedtest/58720256.bin\" \"/speedtest/67108864.bin\" \"/speedtest/75497472.bin\" \"/speedtest/83886080.bin\" \"/speedtest/92274688.bin\" \"/speedtest/100000000.bin\" \"/speedtest/100663296.bin\" \"/speedtest/104857600.bin\" \"/speedtest/250000000.bin\"} and raw.http.request.uri.query eq \"\" and http.request.method in {\"GET\" \"HEAD\"}))",
         "action_parameters": {
           "algorithms": [
             {
@@ -210,7 +108,7 @@
         "description": "bella_speedtest_ssl",
         "enabled": true,
         "action": "set_config",
-        "expression": "((http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=0\" \"bytes=100000\" \"bytes=1000000\" \"bytes=10000000\" \"bytes=25000000\" \"bytes=100000000\" \"bytes=250000000\" \"during=idle&bytes=0\" \"during=download&bytes=0\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"}))) or (http.host eq \"speed-origin.totob12.com\" and raw.http.request.uri.path in {\"/speedtest/0.bin\" \"/speedtest/100000.bin\" \"/speedtest/1000000.bin\" \"/speedtest/10000000.bin\" \"/speedtest/25000000.bin\" \"/speedtest/100000000.bin\" \"/speedtest/250000000.bin\"} and raw.http.request.uri.query eq \"\" and http.request.method in {\"GET\" \"HEAD\"}))",
+        "expression": "((http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and (len(raw.http.request.uri.args[\"bytes\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] in {\"0\" \"100000\" \"1000000\" \"8388608\" \"10000000\" \"16777216\" \"25000000\" \"25165824\" \"33554432\" \"41943040\" \"50331648\" \"58720256\" \"67108864\" \"75497472\" \"83886080\" \"92274688\" \"100000000\" \"100663296\" \"104857600\" \"250000000\"} and all(raw.http.request.uri.args.names[*] in {\"bytes\" \"cb\" \"during\"}) and (not (len(raw.http.request.uri.args[\"cb\"]) ge 0) or (len(raw.http.request.uri.args[\"cb\"]) eq 1 and len(raw.http.request.uri.args[\"cb\"][0]) gt 0 and len(raw.http.request.uri.args[\"cb\"][0]) le 128)) and (not (len(raw.http.request.uri.args[\"during\"]) ge 0) or (len(raw.http.request.uri.args[\"during\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] eq \"0\" and raw.http.request.uri.args[\"during\"][0] in {\"idle\" \"download\"}))) and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"}))) or (http.host eq \"speed-origin.totob12.com\" and raw.http.request.uri.path in {\"/speedtest/0.bin\" \"/speedtest/100000.bin\" \"/speedtest/1000000.bin\" \"/speedtest/8388608.bin\" \"/speedtest/10000000.bin\" \"/speedtest/16777216.bin\" \"/speedtest/25000000.bin\" \"/speedtest/25165824.bin\" \"/speedtest/33554432.bin\" \"/speedtest/41943040.bin\" \"/speedtest/50331648.bin\" \"/speedtest/58720256.bin\" \"/speedtest/67108864.bin\" \"/speedtest/75497472.bin\" \"/speedtest/83886080.bin\" \"/speedtest/92274688.bin\" \"/speedtest/100000000.bin\" \"/speedtest/100663296.bin\" \"/speedtest/104857600.bin\" \"/speedtest/250000000.bin\"} and raw.http.request.uri.query eq \"\" and http.request.method in {\"GET\" \"HEAD\"}))",
         "action_parameters": {
           "ssl": "strict"
         }
@@ -223,7 +121,7 @@
       "host": "speed-origin.totob12.com"
     },
     "description": "bella_speedtest_connector",
-    "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and raw.http.request.uri.query in {\"bytes=0\" \"bytes=100000\" \"bytes=1000000\" \"bytes=10000000\" \"bytes=25000000\" \"bytes=100000000\" \"bytes=250000000\" \"during=idle&bytes=0\" \"during=download&bytes=0\"} and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
+    "expression": "(http.host eq \"data.totob12.com\" and raw.http.request.uri.path eq \"/__down\" and (len(raw.http.request.uri.args[\"bytes\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] in {\"0\" \"100000\" \"1000000\" \"8388608\" \"10000000\" \"16777216\" \"25000000\" \"25165824\" \"33554432\" \"41943040\" \"50331648\" \"58720256\" \"67108864\" \"75497472\" \"83886080\" \"92274688\" \"100000000\" \"100663296\" \"104857600\" \"250000000\"} and all(raw.http.request.uri.args.names[*] in {\"bytes\" \"cb\" \"during\"}) and (not (len(raw.http.request.uri.args[\"cb\"]) ge 0) or (len(raw.http.request.uri.args[\"cb\"]) eq 1 and len(raw.http.request.uri.args[\"cb\"][0]) gt 0 and len(raw.http.request.uri.args[\"cb\"][0]) le 128)) and (not (len(raw.http.request.uri.args[\"during\"]) ge 0) or (len(raw.http.request.uri.args[\"during\"]) eq 1 and raw.http.request.uri.args[\"bytes\"][0] eq \"0\" and raw.http.request.uri.args[\"during\"][0] in {\"idle\" \"download\"}))) and (http.request.method in {\"GET\" \"HEAD\"} or (http.request.method eq \"OPTIONS\" and len(http.request.headers[\"origin\"]) eq 1 and len(http.request.headers[\"origin\"][0]) gt 0 and len(http.request.headers[\"access-control-request-method\"]) eq 1 and http.request.headers[\"access-control-request-method\"][0] in {\"GET\" \"HEAD\"})))",
     "enabled": true
   },
   "cors": {

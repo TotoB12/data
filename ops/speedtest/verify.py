@@ -64,23 +64,36 @@ def exercise_plan(mode):
     exercises = []
     def add(host, path, query, method, size, **extra):
         exercises.append({'host': host, 'path': path, 'query': query, 'method': method, 'bytes': size, **extra})
-    for query in c['queries']:
-        n = int(query.rsplit('bytes=', 1)[1])
+    # HEAD/preflight probes cover every size and both cachebuster orders without
+    # tripling the large corpus transfer. queries is a canonical probe list,
+    # not the structurally matched set of all possible accepted query strings.
+    queries = c['queries'] + [query for n in c['sizes'] for query in
+                             (f'bytes={n}&cb=head-probe', f'cb=head-probe&bytes={n}')]
+    for query in queries:
+        n = int(next(part[6:] for part in query.split('&') if part.startswith('bytes=')))
         add(c['data_host'], c['path'], query, 'HEAD', n, origin=True, kind='object')
         add(c['data_host'], c['path'], query, 'OPTIONS', 0, origin=True, kind='preflight')
-    sizes = c['sizes'] if mode == 'full' else c['sizes'][:3]
+    small = [n for n in c['sizes'] if n <= 1000000]
+    sizes = c['sizes'] if mode == 'full' else small
     for n in sizes:
-        for warm in (False, True):
-            add(c['data_host'], c['path'], f'bytes={n}', 'GET', n, origin=True, warm=warm, kind='object')
-        add(c['origin_host'], f'/speedtest/{n}.bin', '', 'GET', n, origin=True, kind='object')
-    # Both zero loaded-latency queries receive actual-body/hash verification.
-    for query in c['queries'][-2:]:
-        add(c['data_host'], c['path'], query, 'GET', 0, origin=True, kind='object')
+        add(c['data_host'], c['path'], f'bytes={n}', 'GET', n, origin=True, warm=False, kind='object')
+        if n <= 1000000:
+            # Different cb/order must still reuse the same query-cleared CDN key.
+            add(c['data_host'], c['path'], f'cb=warm-probe&bytes={n}', 'GET', n,
+                origin=True, warm=True, kind='object')
+            add(c['origin_host'], f'/speedtest/{n}.bin', '', 'GET', n, origin=True, kind='object')
+    # Actual zero-body/hash probes for loaded latency, with and without cb.
+    for during in ('idle', 'download'):
+        for query in (f'during={during}&bytes=0', f'bytes=0&during={during}',
+                      f'cb=latency&during={during}&bytes=0', f'bytes=0&during={during}&cb=latency'):
+            add(c['data_host'], c['path'], query, 'GET', 0, origin=True, kind='object')
     add(c['data_host'], c['path'], 'bytes=100000', 'GET', 100000, origin=False, kind='object')
     add(c['origin_host'], '/speedtest/100000.bin', 'cb=1', 'GET', 100000, origin=True, kind='origin-query', bypass=True)
     invalid = [('/__down', 'bytes=00'), ('/__down', 'bytes=%30'), ('/__down', 'bytes=0&bytes=0'),
-               ('/__down', 'bytes=0&during=idle'), ('/__down', 'during=IDLE&bytes=0'),
-               ('/__down', 'bytes=0&cb=1'), ('/__down', 'bytes=0&measId=x'),
+               ('/__down', 'bytes=100000&during=idle'), ('/__down', 'during=IDLE&bytes=0'),
+               ('/__down', 'bytes=0&cb='), ('/__down', 'bytes=0&cb=1&cb=2'),
+               ('/__down', 'bytes=0&cb=' + 'x' * 129), ('/__down', 'bytes=-1'),
+               ('/__down', 'bytes=0&during=idle&during=download'), ('/__down', 'bytes=0&measId=x'),
                ('/__down', 'Bytes=0'), ('/__down', ''), ('/__down', 'bytes=123'),
                ('/__DOWN', 'bytes=0'), ('/%5f_down', 'bytes=0'), ('//__down', 'bytes=0'), ('/__down/', 'bytes=0')]
     for path, query in invalid:

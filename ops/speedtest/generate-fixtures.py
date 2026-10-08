@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the seven unencoded raw-random fixtures OUTSIDE every repository."""
+"""Generate the approved known-size unencoded raw-random fixtures OUTSIDE every repository."""
 import argparse
 import json
 from pathlib import Path

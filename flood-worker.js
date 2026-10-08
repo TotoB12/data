@@ -33,16 +33,15 @@ const KB = 1024;
 const MB = KB * KB;
 const GB = MB * KB;
 
-// Only these positive decimal-byte fixtures are routed by our endpoint.
+// Exact-byte downloads use the legacy 100 MiB request ceiling.
 const DOWNLOAD_ENDPOINT = "https://data.totob12.com/__down";
-const DOWNLOAD_SIZES = [100000, 1000000, 10000000, 25000000, 100000000, 250000000];
 const STATIC_SOURCES = [
   {
     id: "own-speedtest",
     label: "TotoB12 speed test",
     url: DOWNLOAD_ENDPOINT,
     mode: "exact",
-    maxRequestBytes: 250000000,
+    maxRequestBytes: 100 * MB,
     weight: 5,
     tier: "primary"
   }
@@ -318,14 +317,13 @@ async function downloadChunk(worker, signal, descriptor) {
 
 function buildRequestDescriptor() {
   const source = pickSource();
-  // Preset/tuner targets use legacy MiB; endpoint fixtures use decimal bytes.
   if (source.url !== DOWNLOAD_ENDPOINT || typeof state.chunkMB !== "number" ||
       !Number.isFinite(state.chunkMB) || state.chunkMB <= 0) {
     throw new Error("Invalid download request");
   }
-  const desiredBytes = Math.min(state.chunkMB * MB, source.maxRequestBytes);
-  const chunkBytes = DOWNLOAD_SIZES.find(size => size >= desiredBytes);
-  const url = `${DOWNLOAD_ENDPOINT}?bytes=${chunkBytes}`;
+  const chunkBytes = Math.round(Math.min(state.chunkMB * MB, source.maxRequestBytes));
+  const cacheBust = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const url = `${DOWNLOAD_ENDPOINT}?cb=${cacheBust}&bytes=${chunkBytes}`;
   return { source, url, headers: {}, chunkBytes };
 }
 

@@ -2,18 +2,18 @@
 
 This directory contains **operational tooling and offline tests**. The existing Data Flood Console now downloads exclusively through its own fixed-size `https://data.totob12.com/__down` endpoint; only its worker's endpoint compatibility changes. Design, controls, presets, adaptive tuning, counters and display formats remain unchanged. `.gitignore`, Pages settings, and the `data.totob12.com` → `data-bqs.pages.dev` mapping remain unchanged. A GitHub merge may trigger the existing automatic Pages deployment. Do not publish fixtures, credentials, reports, or a client harness through Pages.
 
-## Fixed contract
+## Finite known-size compatibility contract
 
 `contract.json` is the approved allowlist; `speedtest_ops.py` renders `cloudflare-rules.json`. Targets are fixed in code as well as JSON so changing JSON cannot silently redirect deployment elsewhere.
 
 - Account: `a8f49ad6ebe26d6d38841a5e1d49ce6d`; zone: `fe78766bf0bcad4c3858ae957b0d4041` (`totob12.com`).
 - Dedicated **Standard** bucket: `totob12-speedtest`, location hint `weur`; custom origin: `speed-origin.totob12.com`, TLS minimum `1.2`; public `r2.dev` access disabled.
-- Exactly seven raw, unencoded random objects: `speedtest/N.bin`, where `N` is `0`, `100000`, `1000000`, `10000000`, `25000000`, `100000000`, `250000000`. Total: **386,100,000 bytes**. No Content-Encoding. Stored Content-Type is `application/octet-stream`; stored Cache-Control is `no-store, no-transform`.
+- Contract version **2** preserves all seven SDK fixtures (`0`, `100000`, `1000000`, `10000000`, `25000000`, `100000000`, `250000000`) and adds the old console's 13 exact-byte sizes: **8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96 and 100 MiB**, each multiplied by `1048576`. `legacy_sizes` and `client_sizes` identify the two sets; `sizes` is their sorted union. Exactly **20** raw, unencoded random objects under `speedtest/N.bin`, totaling **1,145,269,024 bytes**; added fixtures total **759,169,024 bytes**. No Content-Encoding. Stored Content-Type is `application/octet-stream`; stored Cache-Control is `no-store, no-transform`. This is finite known-size compatibility, **not arbitrary-size generation or a complete Cloudflare speedtest clone**.
 - Original raw path must be exactly `/__down`; `GET` and `HEAD` are routed/re-written. `OPTIONS` is routed only for a real preflight: exactly one nonempty `Origin` value and exactly one `Access-Control-Request-Method` value equal to `GET` or `HEAD` (case-sensitive). Arbitrary origins, including opaque `null`, are allowed; missing/empty/duplicate headers, plain OPTIONS and POST-oriented preflights stay on Pages. Header-map keys are lowercase; array-cardinality checks prevent missing-value comparisons from admitting absent headers. No regex/paid matching feature is used.
-- Exactly nine **literal** original query strings: `bytes=N` for those seven sizes, `during=idle&bytes=0`, `during=download&bytes=0`. Order, case, duplicates, encoding and spelling matter. `cb`, `measId`, extra parameters, reordered parameters, encoded values, other sizes and methods are unsupported.
-- Seven static URL rewrites, with the three zero-byte queries grouped in one rule; each rewrites to `/speedtest/N.bin` and explicitly rewrites the query to `""`.
+- The immutable `raw.http.request.uri.args` map enforces exactly one `bytes` value, equal to a canonical decimal spelling in the 20-size allowlist. Optional `cb` is a singleton nonempty raw value of at most 128 characters; it is ignored for fixture selection. Optional `during` is a singleton `idle` or `download` **only with `bytes=0`**. Parameter order is irrelevant: `cb=x&bytes=8388608`, `bytes=8388608&cb=x`, and either latency ordering are accepted. Only raw names `bytes`, `cb`, `during` are allowed; duplicate keys, encoded/leading-zero/negative/nondecimal byte values, unknown keys (`measId`, etc.) and other sizes fail closed. Optional absence uses a negated array-length existence check, not an empty-string comparison. `queries` in the JSON is a canonical verifier probe list, not an exhaustive literal whitelist.
+- One dynamic URL rewrite, stable ref `bella_speedtest_rewrite`: `concat("/speedtest/", http.request.uri.args["bytes"][0], ".bin")`; the original raw singleton/allowlist guard precedes it. The rewritten query is explicitly `""`, so `cb` never creates a separate CDN object key. Browser fetches still use `cache: "no-store"`; browser no-store and the scoped CDN edge cache are distinct policies.
 - One `cloudflare_r2` Cloud Connector, target `speed-origin.totob12.com`, same data-host allowlist. Connector updates preserve the entire unrelated connector list, including IDs and order.
-- One cache exception **appended after** the existing enabled `expression: true`, `cache: false` catchall. Never modify that catchall. Cache eligibility is GET/HEAD only: either the literal data-host download allowlist or the seven exact origin object paths with an empty raw query. OPTIONS is excluded. Edge TTL overrides origin for 30 days (`2592000`); status 200 gets that TTL, other valid HTTP status codes get `-1` (do not cache). Browser TTL respects origin.
+- One cache exception **appended after** the existing enabled `expression: true`, `cache: false` catchall. Never modify that catchall. Cache eligibility is GET/HEAD only: either the structural data-host download allowlist or the 20 exact origin object paths with an empty raw query. OPTIONS is excluded. Edge TTL overrides origin for 30 days (`2592000`); status 200 gets that TTL, other valid HTTP status codes get `-1` (do not cache). Browser TTL respects origin.
 - One response-header rule on the download scope, including only qualifying data-host preflights: `Cache-Control: no-store, no-transform`, `Access-Control-Allow-Origin: *`, `Timing-Allow-Origin: *`; expose `Content-Length, Content-Range, Accept-Ranges, CF-Cache-Status, Age, Server-Timing, Content-Encoding`. Rewrites, connector, headers, compression and SSL share that data-host gate; direct origin scope remains GET/HEAD only. Bucket CORS has stable rule ID `bella-speedtest-public-downloads`; exact CORS readback includes it and never drops unknown writable fields.
 - One scoped compression rule (`compress_response`, `algorithms: [{"name":"none"}]`) and one scoped configuration rule (`set_config`, `ssl: strict`). No global SSL/security changes, Workers, Functions, Tiered Cache, Cache Reserve or paid features.
 
@@ -39,13 +39,13 @@ To deliberately regenerate the checked-in payload, redirect the renderer output 
 
 ## Existing console integration
 
-`flood-worker.js` has one download source, `https://data.totob12.com/__down`. It converts the existing internal MiB target to the smallest supported positive decimal-byte fixture at or above that target, capped at 250,000,000 bytes. Requests are literal `GET ?bytes=N`, with no cachebuster, extra query or Range; browser cache is `no-store`, credentials are omitted and redirects are refused. Before reading, the worker requires HTTP 200, the exact requested URL, `application/octet-stream`, the matching literal Content-Length and absent Content-Encoding, so unsupported-query Pages HTML is not accepted.
+`flood-worker.js` has one download source, `https://data.totob12.com/__down`. It requests the original console's exact reachable MiB sizes, capped at **100 MiB (104,857,600 bytes)**, without rounding them up to SDK decimal fixtures. Requests retain the old-client `GET ?cb=...&bytes=N` shape; no Range or unrelated service is used. Browser cache is `no-store`, credentials are omitted and redirects are refused. Before reading, the worker requires HTTP 200, the exact requested URL, `application/octet-stream`, the matching literal Content-Length and absent Content-Encoding, so unsupported-query Pages HTML is not accepted.
 
-The page still starts only through its existing toggle. No SDK, upload, logging backend, production harness or new controls are added. Original counters, reset/stop/restart handling, source backoff/fallback behavior and displayed units/target chunk size are deliberately unchanged: internal `MB`/`GB` conversions remain binary (MiB/GiB), while endpoint sizes are decimal bytes. The displayed target is not necessarily the selected fixture size, and existing header-based accounting is not packet-level usage measurement. Offline VM tests cover endpoint compatibility and preserve these legacy behaviors; they do not prove live routing or browser behavior.
+The page still starts only through its existing toggle. No SDK, upload, logging backend, production harness or new controls are added. Original counters, reset/stop/restart handling, source backoff/fallback behavior and displayed units/target chunk size are deliberately unchanged: internal `MB`/`GB` conversions remain binary (MiB/GiB), while endpoint query values are decimal spellings of exact byte counts. The console's MiB target maps to its exact known fixture, not a larger SDK size; existing header-based accounting is not packet-level usage measurement. Offline VM tests cover endpoint compatibility and preserve these legacy behaviors; they do not prove live routing or browser behavior.
 
 ## Generate fixtures privately
 
-Use a new absolute directory outside **every** repository and Pages/public deployment tree; outputs under this repository, symlink paths, and public/www/htdocs/dist/build/pages ancestry are refused. Reserve at least 386,100,000 bytes plus space for temporary chunks. These are binary OS-random bytes, not repeated patterns, zero-filled files, base64 or compressed files.
+Use a new absolute directory outside **every** repository and Pages/public deployment tree; outputs under this repository, symlink paths, and public/www/htdocs/dist/build/pages ancestry are refused. For a new complete corpus, reserve at least 1,145,269,024 bytes plus space for temporary chunks. Preserve existing legacy fixture bytes/hashes; do not regenerate them to expand an existing deployment. These are binary OS-random bytes, not repeated patterns, zero-filled files, base64 or compressed files.
 
 ```sh
 PRIVATE="$HOME/.speedtest-private"
@@ -75,7 +75,7 @@ Keep operator execution exclusive: S3 snapshot/pre-upload checks detect observed
 
 The parent first reported Standard/WEUR bucket creation, CORS, disabled r2.dev and TLS-attached origin readback, but REST/MCP object HTTP metadata ignored Cache-Control. A streamed attempted 250,000,000-byte object silently stored **134,210,688 bytes** despite a successful response; the corrupt approved object was deleted. Do not reuse that upload path or trust its success result.
 
-The parent subsequently resolved secure direct-S3 access, conditionally self-copied the six existing objects to set exact stored Cache-Control/SHA metadata, and generated/uploaded the exact 250,000,000-byte object by multipart. They reported HeadObject length/HTTP metadata readback for all seven (386,100,000 bytes total), recorded in an external **`r2-corpus-manifest.json`** with known expected body SHA-256 values. **Do not regenerate or re-upload that current corpus.** Use `verify.py --corpus-manifest` against the existing receipt after review/routing approval. This implementation only validates the receipt locally; it has not contacted the account or independently proved remote body equality. Full streamed public hashes, routing/cache/browser checks and owner credential revocation still belong to the deploying operator.
+The parent subsequently resolved secure direct-S3 access, conditionally self-copied the six existing objects to set exact stored Cache-Control/SHA metadata, and generated/uploaded the exact 250,000,000-byte object by multipart. They reported HeadObject length/HTTP metadata readback for all seven (386,100,000 bytes total), recorded in an external **`r2-corpus-manifest.json`** with known expected body SHA-256 values. **Do not regenerate or re-upload those seven legacy fixtures.** Their old seven-object receipt is historical version-1 evidence, not a complete version-2 manifest. Before expanded routing, the operator must add/verify only the 13 missing client fixtures and produce a combined 20-object receipt preserving all legacy hashes. Version-2 tooling deliberately rejects an incomplete seven-object receipt; use the combined receipt with `verify.py --corpus-manifest`. This implementation only validates the receipt locally; it has not contacted the account or independently proved remote body equality. Full streamed public hashes, routing/cache/browser checks and owner credential revocation still belong to the deploying operator.
 
 ## Staged deployment (default is dry-run)
 
@@ -89,7 +89,7 @@ python ops/speedtest/deploy.py --stage origin --audit-dir "$PRIVATE/audit-origin
 python ops/speedtest/deploy.py --stage origin --apply --audit-dir "$PRIVATE/audit-origin-apply-001"
 ```
 
-Wait for origin ownership and certificate `status` to be `active`, verify TLS and the exact CORS/managed-domain state. The rules stage refuses an absent bucket, inactive origin, wrong minimum TLS, enabled r2.dev or CORS drift. `--stage all` covers **account configuration only**, never uploads, and is available only when those prerequisites are already ready. Prefer separated stages for a new deployment. Confirm all seven objects' exact stored lengths and metadata before enabling routing.
+Wait for origin ownership and certificate `status` to be `active`, verify TLS and the exact CORS/managed-domain state. The rules stage refuses an absent bucket, inactive origin, wrong minimum TLS, enabled r2.dev or CORS drift. `--stage all` covers **account configuration only**, never uploads, and is available only when those prerequisites are already ready. Prefer separated stages for a new deployment. Confirm all 20 objects' exact stored lengths, hashes and metadata before enabling expanded routing. Do not replace the seven static legacy rewrites while new fixtures are absent or unverified.
 
 ### Direct S3 objects stage
 
@@ -101,12 +101,12 @@ python ops/speedtest/deploy.py --stage objects --dry-run --offline --fixture-dir
 "$PRIVATE/s3-venv/bin/python" ops/speedtest/deploy.py --stage objects \
   --fixture-dir "$PRIVATE/fixtures" --audit-dir "$PRIVATE/audit-objects-dry-001"
 
-# After reviewing drift, upload all seven approved keys, never other keys.
+# New deployment only: upload approved known keys, never other keys.
 "$PRIVATE/s3-venv/bin/python" ops/speedtest/deploy.py --stage objects --apply \
   --fixture-dir "$PRIVATE/fixtures" --audit-dir "$PRIVATE/audit-objects-apply-001"
 ```
 
-For a new deployment with existing incomplete/metadata-deficient fixtures, both plan/apply require explicit `--replace-existing-objects` to permit replacing **selected approved keys only**. This is a deliberate overwrite, not a general bucket sync. To operate only the largest missing fixture, add `--size 250000000`; repeat `--size` for a subset. Do not use that shortcut to leave the other six objects with wrong Cache-Control or a different random fixture hash. All seven must correspond to the intended deployed corpus manifest. For the already repaired parent corpus, skip this S3 stage entirely and use its existing receipt for verification.
+For a new deployment with existing incomplete/metadata-deficient fixtures, both plan/apply require explicit `--replace-existing-objects` to permit replacing **selected approved keys only**. This is a deliberate overwrite, not a general bucket sync. To operate only the largest missing fixture, add `--size 250000000`; repeat `--size` for a subset. Do not leave any other approved object with wrong Cache-Control or a different intended fixture hash. All 20 must correspond to the combined deployed corpus manifest. For the repaired seven-object parent corpus, preserve those keys and add only missing client fixtures; repeat `--size` for the 13 client sizes. Never regenerate legacy bytes merely to obtain a new manifest.
 
 The S3 stage explicitly supplies Content-Type, **stored Cache-Control**, Standard S3 storage class (`STANDARD`), and SHA-256/owner user metadata; it never supplies Content-Encoding. Uploads stream from disk. Objects at/above 64 MiB use multipart with 32 MiB parts and two concurrent streams, including the exact 250,000,000-byte object. SDK request retries are limited to one attempt; this does not turn logical byte counts into packet-level billing measurement. A successful upload is accepted only after HeadObject confirms exact ContentLength, type, Cache-Control, absent ContentEncoding, Standard storage and expected user metadata. Silent truncation or missing cache metadata is a failure. Failure evidence is retained; no automatic object deletion or rollback.
 
@@ -114,18 +114,44 @@ The S3 stage explicitly supplies Content-Type, **stored Cache-Control**, Standar
 
 ### Rules / connector stage
 
+For version-1 migration, first verify all added fixtures and prepare the combined
+20-object known-hash/HeadObject receipt. Review an offline plan with
+`--migrate-legacy-rewrites --update-owned`; live migration additionally requires
+`--corpus-manifest /absolute/private/combined-receipt.json`. The receipt is copied
+into the private audit and validates exact lengths/metadata/expected hashes, not
+remote body equality. The operator still owns body verification before routing.
+
+`--migrate-legacy-rewrites` recognizes **only all seven exact approved version-1
+static rules** (refs, expressions, action parameters, enabled state and every
+writable field). Missing/partial, duplicate, mixed static/dynamic, drifted or
+unknown owned rules fail closed even with `--update-owned`. One audited ruleset
+PUT removes just those proven rules, inserts the dynamic rule at their first
+position, and preserves every unrelated rule's ID, writable configuration and
+relative order. Exact full-array readback is mandatory; observed concurrency
+stops before writes. Other phases' owned expressions/connector need reviewed
+`--update-owned` updates for the expanded scope. The existing cache:false catchall
+and Oliver's SSL rule are never replaced or reordered.
+
 ```sh
 python ops/speedtest/deploy.py --stage rules --audit-dir "$PRIVATE/audit-rules-dry-001"
 python ops/speedtest/deploy.py --stage rules --apply --audit-dir "$PRIVATE/audit-rules-apply-001"
 # Offline diff against a private prior snapshot, never a stale live apply:
 python ops/speedtest/deploy.py --offline --stage rules --snapshot-input "$PRIVATE/audit-rules-dry-001/before.json"
+
+# Version-1 migration preview; no account calls or writes:
+python ops/speedtest/deploy.py --offline --stage rules --migrate-legacy-rewrites --update-owned \
+  --snapshot-input "$PRIVATE/audit-rules-dry-001/before.json"
+# AFTER every added object is verified, reviewed live dry-run (omit --offline):
+python ops/speedtest/deploy.py --stage rules --migrate-legacy-rewrites --update-owned \
+  --corpus-manifest "$PRIVATE/r2-corpus-v2-manifest.json" --audit-dir "$PRIVATE/audit-v2-dry-001"
+# Apply only the reviewed migration with a NEW audit directory and --apply.
 ```
 
 Review private `plan.json` against `before.json`, including broader wildcard/global rules the conservative collision detector cannot fully reason about. Expected refs are deterministic `bella_speedtest_*`; same owned rules are no-ops. Duplicate refs, unknown owned refs, nonowned endpoint-host rules/connectors, misplaced cache exception and unknown connector fields fail closed. Owned drift is refused by default; after reviewing its exact scope, `--update-owned` permits PATCH of only those exact rule refs, the exact owned connector description and the dedicated bucket CORS. It does not give permission to rewrite unrelated rules.
 
 On redeployment, an existing owned strict SSL rule followed by an enabled non-strict `set_config` SSL rule is rejected unless nonoverlap is provable (literal unrelated-host equality or `false`). A later global Flexible/Full/off rule or uncertain wildcard predicate requires manual review even with `--update-owned`. The tool never repositions the owned rule or changes unrelated SSL rules, including Oliver's strict rule. Earlier global settings remain untouched; an initially appended endpoint strict rule follows them.
 
-Existing rulesets receive individual append POSTs (owned updates use PATCH), not a replace-all rulesets PUT. Missing phase entrypoints are created with zone kind and just the approved phase's rules. Initial deployment order is scoped SSL/compression/headers, rewrites, connector, then the cache exception **last**: keep the existing cache:false catchall in force until routing is ready so transient Pages HTML cannot be cached for 30 days. Connector API requires PUT of a full array: its existing unrelated entries/IDs/order are preserved, a fresh comparison guards observed concurrent changes, and full list readback is checked. Account token, transport errors and raw API error bodies are never printed. A live failure/permission denial stops; offline render does not pretend a deployment happened.
+Existing rulesets normally receive individual append POSTs (owned updates use PATCH). The sole explicit replacement exception is the audited seven-static-to-one-dynamic rewrite migration described here; there is no owned-prefix bulk deletion. Missing phase entrypoints are created with zone kind and just the approved phase's rules. Initial deployment order is scoped SSL/compression/headers, rewrites, connector, then the cache exception **last**: keep the existing cache:false catchall in force until routing is ready so transient Pages HTML cannot be cached for 30 days. Connector API requires PUT of a full array: its existing unrelated entries/IDs/order are preserved, a fresh comparison guards observed concurrent changes, and full list readback is checked. Account token, transport errors and raw API error bodies are never printed. A live failure/permission denial stops; offline render does not pretend a deployment happened.
 
 Cloud Connector PUT can regenerate the exact `bella_speedtest_connector` rule's ID. Its description is the stable ownership marker: refresh GET before every action, including rollback/restore, rather than reuse a prior ID. Readback accepts only its nonempty server-assigned ID changing; every other field and array order/count remain exact, and unrelated ID drift is fatal.
 
@@ -133,16 +159,16 @@ Optional GET absence handling is narrow: HTTP 404, one failure-envelope error, c
 
 ## Real HTTP verification / traffic budget
 
-Choose the intended deployed corpus, not a newly generated unrelated random set. `--manifest` is the generator's manifest and re-hashes all local fixture files. **`--corpus-manifest`** accepts the parent's external `r2-corpus-manifest.json` known-SHA/HeadObject receipt without needing local copies of the six self-copied objects. It validates the exact bucket, seven keys/order/sizes, total/count, SHA syntax (including the empty-file digest), stored HTTP metadata and metadata-readback marker. Those are receipt validations, **not** local-file hashes or remote-body proof; provenance is explicit in the JSON report. The subsequent HTTP GETs still must match each known expected SHA. Do not substitute multipart ETags or blindly copied user metadata for known body hashes.
+Choose the intended deployed corpus, not a newly generated unrelated random set. `--manifest` is the generator's manifest and re-hashes all local fixture files. **`--corpus-manifest`** accepts the parent's combined external `r2-corpus-v2-manifest.json` known-SHA/HeadObject receipt without needing local copies of the six self-copied objects. It validates the exact bucket, all 20 keys/order/sizes, total/count, SHA syntax (including the empty-file digest), stored HTTP metadata and metadata-readback marker. Those are receipt validations, **not** local-file hashes or remote-body proof; provenance is explicit in the JSON report. The subsequent HTTP GETs still must match each known expected SHA. Do not substitute multipart ETags or blindly copied user metadata for known body hashes.
 
 ```sh
-# Current already-provisioned parent corpus: offline receipt validation/preview.
-python ops/speedtest/verify.py --plan --corpus-manifest "$PRIVATE/r2-corpus-manifest.json"
+# Expanded parent corpus: offline combined-v2 receipt validation/preview.
+python ops/speedtest/verify.py --plan --corpus-manifest "$PRIVATE/r2-corpus-v2-manifest.json"
 # After review and approved routing: use that SAME receipt, no re-upload.
-python ops/speedtest/verify.py --corpus-manifest "$PRIVATE/r2-corpus-manifest.json" \
+python ops/speedtest/verify.py --corpus-manifest "$PRIVATE/r2-corpus-v2-manifest.json" \
   --report "$PRIVATE/verify-current-quick-001.json"
 python ops/speedtest/verify.py --mode full --allow-large --budget-bytes 1400000000 \
-  --corpus-manifest "$PRIVATE/r2-corpus-manifest.json" --report "$PRIVATE/verify-current-full-001.json"
+  --corpus-manifest "$PRIVATE/r2-corpus-v2-manifest.json" --report "$PRIVATE/verify-current-full-001.json"
 
 # Alternative: a new deployment made from locally generated fixtures.
 python ops/speedtest/verify.py --manifest "$PRIVATE/fixtures/manifest.json" \
@@ -152,11 +178,11 @@ python ops/speedtest/verify.py --mode full --allow-large --budget-bytes 14000000
   --manifest "$PRIVATE/fixtures/manifest.json" --report "$PRIVATE/verify-full-001.json"
 ```
 
-Quick mode GETs only 0/100,000/1,000,000-byte fixtures (including origin objects and repeats); HEAD checks all nine queries, and OPTIONS checks all nine preflights. Planned object GET body bytes are **3,500,000**; default ceiling is **5,000,000** including all fallback/error body reads. Large Pages HTML/error bodies may exhaust this small budget: that is a reported failure, not permission to silently raise it. Full mode GETs every size twice on the endpoint and once on the origin, plus small query/Origin probes: **1,158,500,000** planned object GET bytes, leaving room for fallback/error bodies under the explicit budget. Reports separately count their own exercised bytes and request results.
+Quick mode GETs only 0/100,000/1,000,000-byte fixtures (including origin objects and cachebuster repeats); HEAD and OPTIONS probe all 20 sizes, both cb orderings and the canonical zero latency forms. Planned object GET body bytes remain **3,500,000**; default ceiling is **5,000,000** including all fallback/error body reads. Large Pages HTML/error bodies may exhaust this small budget: that is a reported failure, not permission to silently raise it. Full mode streams each of the 20 fixtures **once** on the data endpoint; warm cb/reordered GETs and direct-origin GETs are restricted to at most 1,000,000 bytes, with zero-byte loaded-latency variants and small Origin probes. Planned object GET body bytes: **1,147,669,024** (178 exercises), leaving room for fallback/error bodies under the explicit budget. It does not download three copies of the expanded corpus. Reports separately count their own exercised bytes and request results.
 
 The approved deployment verification ceiling is **2,000,000,000 bytes shared across operator exercises**, not a per-command allowance. Aggregate quick, full, browser/client exercises and other verification requests, including prior failed reads; lower the next budget accordingly. The example client's positive requested download counts alone can request up to **969,000,000 bytes**, so do not blindly run it plus full verification within the same 2GB approval. The client can finish early based on duration, which is not a budget guarantee. Tool reports count body bytes actually read, including HTTP errors and partial failed reads; they do **not** claim to include TLS/HTTP headers or bytes sent by the server after closing a response. S3 upload traffic must be tracked separately by the operator.
 
-Verification streams raw bytes without decompression, checks actual length/SHA-256, Content-Length/type/encoding, browser no-store headers, CORS/TAO/exposure, Accept-Ranges, Origin/no-Origin responses and repeated-GET CF cache HIT/Age evidence. OPTIONS must not be cache HIT. Nonempty origin queries must bypass the cache exception. It tests literal unsupported query/path variants against Pages HTML fallback. Negative normalization probes are real HTTP tests, not a claim that the Python model predicts Cloudflare normalization.
+Verification streams raw bytes without decompression, checks actual length/SHA-256, Content-Length/type/encoding, browser no-store headers, CORS/TAO/exposure, Accept-Ranges, Origin/no-Origin responses and repeated-GET CF cache HIT/Age evidence. OPTIONS must not be cache HIT. Nonempty origin queries must bypass the cache exception. It tests unsupported query/path variants against Pages HTML fallback, including duplicate/empty/overlong cb, nonzero during, encoded bytes and wrong paths. Negative normalization probes are real HTTP tests, not a claim that the Python model predicts Cloudflare normalization.
 
 A warm request can reach another POP (inspect `CF-RAY`) and return MISS; the strict verifier may flag a failed cache assertion despite passing body/header checks. Keep the original failed receipt and record bounded follow-up requests proving actual HIT/Age within the remaining approved traffic budget. The edge TTL does not guarantee retention or HITs across POPs.
 
@@ -164,7 +190,7 @@ No redirects, automatic retries or unlimited error-body reads. Socket timeout de
 
 ## Purge and rollback
 
-Do not purge the entire zone. After changing fixtures/metadata/CORS, issue an operator-reviewed **targeted** purge for all nine original data URLs plus the seven rewritten data-host paths with empty query and the seven origin object URLs. Rewrites/connector routing may cause more than one key shape to matter. Include the actual `Origin` header variants used by probes/browser clients and consider no-Origin cached variants; URL-only purges may not evict a custom/header-dependent cache key. Consult Cloudflare's single-file purge/CORS guidance, use current observed keys, and read back/test again. This tooling intentionally does not auto-purge or broaden cache keys to unsupported queries.
+Do not purge the entire zone. After changing fixtures/metadata/CORS, issue an operator-reviewed **targeted** purge for the canonical original data URLs plus the 20 rewritten data-host paths with empty query and the 20 origin object URLs; include observed old-client cb/order variants if they affect actual cache keys. The rewrite clears cb and during, so do not try to enumerate an unlimited cachebuster space. Rewrites/connector routing may cause more than one key shape to matter. Include the actual `Origin` header variants used by probes/browser clients and consider no-Origin cached variants; URL-only purges may not evict a custom/header-dependent cache key. Consult Cloudflare's single-file purge/CORS guidance, use current observed keys, and read back/test again. This tooling intentionally does not auto-purge or broaden cache keys to unsupported queries.
 
 Rollback should **disable only the created owned rules and connector**, preserving the rest of each ruleset/full connector list; fetch fresh state and exact readbacks. Restore reviewed dedicated-bucket CORS only if appropriate. Do not restore an entire stale zone snapshot over others' changes. Do not delete the bucket, other objects, custom DNS mappings or the origin domain without separate owner approval. Keep private before/plan/readback reports as evidence.
 
@@ -189,6 +215,8 @@ Phase/action/payload shape was checked against Cloudflare's published documentat
 - https://developers.cloudflare.com/r2/examples/aws/boto3/
 - https://developers.cloudflare.com/r2/api/s3/api/
 - https://developers.cloudflare.com/r2/api/error-codes/
+- https://developers.cloudflare.com/ruleset-engine/rules-language/fields/reference/raw.http.request.uri.args/
+- https://developers.cloudflare.com/ruleset-engine/rules-language/fields/reference/raw.http.request.uri.args.names/
 - https://developers.cloudflare.com/ruleset-engine/rules-language/fields/reference/http.request.headers/
 - https://developers.cloudflare.com/ruleset-engine/rules-language/functions/#len
 - https://developers.cloudflare.com/ruleset-engine/rules-language/values/#missing-values

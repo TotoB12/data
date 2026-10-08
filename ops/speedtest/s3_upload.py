@@ -147,7 +147,7 @@ def run_stage(args):
     manifest = ops.validate_manifest(fixture_dir)
     sizes = args.size or ops.load_contract()['sizes']
     if not set(sizes) <= set(ops.load_contract()['sizes']):
-        raise ValueError('Only the seven approved object sizes can be selected')
+        raise ValueError('Only the approved known object sizes can be selected')
     if args.offline:
         return {'mode': 'offline-object-plan', 'objects': [e for e in manifest['objects'] if e['bytes'] in sizes],
                 'remote_state_checked': False, 'credential_required': 'R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY only for live object work'}
@@ -157,7 +157,7 @@ def run_stage(args):
     audit.mkdir(parents=True, mode=0o700, exist_ok=False)
     os.chmod(audit, 0o700)
     client, transfer = client_and_transfer(args.timeout)
-    # Snapshot all seven touched-namespace objects before ANY write, not just a
+    # Snapshot all approved touched-namespace objects before ANY write, not just a
     # planned subset. Never list/delete/mutate unrelated bucket keys.
     snapshot = {e['key']: head_object(client, e['key']) for e in manifest['objects']}
     ops.private_json(audit / 'objects-before.json', snapshot)

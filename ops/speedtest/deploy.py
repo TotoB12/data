@@ -157,7 +157,39 @@ def provably_other_host(expression, contract):
     return bool(host and host[1].lower() not in (contract['data_host'], contract['origin_host']))
 
 
-def build_plan(state, stage='all', update_owned=False):
+def legacy_rewrite_replacement(current_rules, desired):
+    """Return a lossless seven-to-one rule list only for exact approved v1 state.
+
+    Caller must explicitly authorize migration. Never treat an owned prefix as
+    permission to remove rules, and never repair partial/drifted legacy state.
+    """
+    expected = {r['ref']: r for r in ops.legacy_rewrite_rules()}
+    legacy = [r for r in current_rules if r.get('ref') in expected]
+    if not legacy:
+        return None
+    if (len(legacy) != len(expected) or {r['ref'] for r in legacy} != set(expected)
+            or any(r.get('ref') == desired['ref'] for r in current_rules)
+            or any(not same_rule(r, expected[r['ref']]) for r in legacy)):
+        raise ValueError('Legacy rewrite migration requires all seven exact approved static rules and no dynamic rule')
+    ids = [r.get('id') for r in current_rules]
+    if (any(not isinstance(rule_id, str) or not rule_id for rule_id in ids)
+            or len(ids) != len(set(ids))):
+        raise ValueError('Legacy migration requires unique nonempty IDs for every existing rule')
+    result, inserted = [], False
+    for old in current_rules:
+        if old.get('ref') in expected:
+            if not inserted:
+                result.append(copy.deepcopy(desired))
+                inserted = True
+        else:
+            # Keep IDs and ALL writable configuration; only server-managed
+            # version/timestamp fields are removed from the update payload.
+            result.append({k: copy.deepcopy(v) for k, v in old.items()
+                           if k not in {'version', 'last_updated'}})
+    return result
+
+
+def build_plan(state, stage='all', update_owned=False, migrate_legacy_rewrites=False):
     if stage not in ('all', 'bucket', 'origin', 'rules'):
         raise ValueError('Unknown deployment stage')
     c, rendered = ops.load_contract(), ops.render_rules()
@@ -221,12 +253,30 @@ def build_plan(state, stage='all', update_owned=False):
         refs = [r.get('ref') for r in current_rules if r.get('ref')]
         if len(refs) != len(set(refs)):
             raise ValueError('Duplicate ruleset ref collision')
+        replacement = None
+        legacy_refs = set()
+        if phase == 'http_request_transform' and migrate_legacy_rewrites:
+            replacement = legacy_rewrite_replacement(current_rules, desired_rules[0])
+            if replacement is not None:
+                legacy_refs = {r['ref'] for r in ops.legacy_rewrite_rules()}
         for old in current_rules:
             ref, expression = old.get('ref', ''), old.get('expression', '')
+            if ref in legacy_refs:
+                continue
             if ref.startswith(ops.OWNED_PREFIX) and ref not in allowed_refs:
                 raise ValueError('Unknown speedtest-owned ref in phase; manual review required')
             if ref not in allowed_refs and old.get('enabled', True) and any(host in expression for host in (c['data_host'], c['origin_host'])):
                 raise ValueError('Non-owned rule mentioning endpoint host; review overlap manually before deployment')
+        if replacement is not None:
+            if current is None:
+                raise ValueError('Legacy migration requires an existing ruleset')
+            # Explicit audited whole-ruleset update is the only removal path.
+            # Unrelated rules retain their IDs, settings and relative order.
+            body = {'rules': replacement}
+            add('PUT', zone + f'/rulesets/{current["id"]}', body,
+                zone + f'/rulesets/phases/{phase}/entrypoint', current,
+                'rewrite_migration', replacement)
+            continue
         if current is None:
             body = {'name': ops.OWNED_PREFIX + phase, 'kind': 'zone', 'phase': phase, 'rules': desired_rules}
             add('POST', zone + '/rulesets', body, zone + f'/rulesets/phases/{phase}/entrypoint', None, 'ruleset', desired_rules)
@@ -307,6 +357,20 @@ def verify_readback(operation, after, before):
                     not owned or (isinstance(actual.get('id'), str) and bool(actual['id']))) and {
                     k: v for k, v in actual.items() if k != 'id' or not ignore_id} == {
                     k: v for k, v in want.items() if k != 'id' or not ignore_id}
+    elif check == 'rewrite_migration':
+        rules = after.get('rules', []) if isinstance(after, dict) else []
+        unchanged_fields = lambda value: {k: v for k, v in (value or {}).items()
+                                          if k not in {'rules', 'version', 'last_updated'}}
+        okay = (isinstance(after, dict) and unchanged_fields(after) == unchanged_fields(before)
+                and isinstance(rules, list) and len(rules) == len(desired)
+                and all(isinstance(r, dict) and isinstance(r.get('id'), str) and r['id'] for r in rules))
+        if okay:
+            for actual, want in zip(rules, desired):
+                okay = okay and same_rule(actual, want)
+                if want.get('ref') != 'bella_speedtest_rewrite':
+                    okay = okay and actual.get('id') == want.get('id')
+            ids = [r['id'] for r in rules]
+            okay = okay and len(ids) == len(set(ids))
     elif check in ('rule', 'ruleset'):
         rules = (after or {}).get('rules', [])
         wanted = desired if check == 'ruleset' else [desired]
@@ -365,15 +429,23 @@ def main(argv=None):
     p.add_argument('--audit-dir', type=Path, help='Required NEW absolute external private directory for live operations')
     p.add_argument('--stage', choices=('bucket', 'origin', 'objects', 'rules', 'all'), default='all', help='objects is a SEPARATE direct-S3 stage; all covers account configuration only')
     p.add_argument('--fixture-dir', type=Path, help='External validated fixtures for --stage objects')
-    p.add_argument('--size', action='append', type=int, help='Object size selection (repeatable); default all seven')
+    p.add_argument('--size', action='append', type=int, help='Object size selection (repeatable); default all approved known sizes')
     p.add_argument('--replace-existing-objects', action='store_true', help='Explicit permission to replace only selected approved object keys after reviewing the S3 snapshot')
     p.add_argument('--update-owned', action='store_true', help='Allow PATCH of exact owned rule refs/connector and dedicated CORS after reviewing drift')
+    p.add_argument('--migrate-legacy-rewrites', action='store_true',
+                   help='Explicitly replace only the complete exact seven approved v1 static rewrites with one v2 rule; verify all fixtures first')
+    p.add_argument('--corpus-manifest', type=Path,
+                   help='External combined v2 known-hash/HeadObject receipt; required for live legacy migration, not remote body proof')
     p.add_argument('--timeout', type=float, default=30)
     args = p.parse_args(argv)
     if args.apply and (args.offline or args.dry_run):
         p.error('--apply is incompatible with --offline/--dry-run')
     if args.timeout <= 0:
         p.error('--timeout must be positive')
+    if (args.migrate_legacy_rewrites or args.corpus_manifest) and args.stage not in ('rules', 'all'):
+        p.error('Migration/combined corpus receipt flags require --stage rules or all')
+    if args.migrate_legacy_rewrites and not args.offline and not args.corpus_manifest:
+        p.error('Live legacy migration requires --corpus-manifest for all approved v2 objects; verify fixtures before routing')
     try:
         if args.stage == 'objects':
             if args.snapshot_input or args.update_owned:
@@ -383,10 +455,11 @@ def main(argv=None):
             return 0
         if args.fixture_dir or args.size or args.replace_existing_objects:
             p.error('Object fixture/selection/replacement flags require --stage objects')
+        corpus = ops.validate_corpus_manifest(args.corpus_manifest) if args.corpus_manifest else None
         if args.offline:
             if args.snapshot_input:
                 state = json.loads(ops.external_path(args.snapshot_input).read_text())
-                print(json.dumps({'mode': 'offline-plan', 'operations': build_plan(state, args.stage, args.update_owned)}, indent=2))
+                print(json.dumps({'mode': 'offline-plan', 'operations': build_plan(state, args.stage, args.update_owned, args.migrate_legacy_rewrites)}, indent=2))
             else:
                 print(json.dumps({'mode': 'offline-render', 'stage': args.stage, 'rules': ops.render_rules()}, indent=2))
             return 0
@@ -397,17 +470,19 @@ def main(argv=None):
         audit = ops.external_path(args.audit_dir)
         audit.mkdir(mode=0o700, parents=True, exist_ok=False)
         os.chmod(audit, 0o700)
+        if corpus is not None:
+            ops.private_json(audit / 'corpus-receipt.json', corpus)
         api = API(args.timeout)
         state = snapshot(api)
         ops.private_json(audit / 'before.json', state)
-        plan = build_plan(state, args.stage, args.update_owned)
+        plan = build_plan(state, args.stage, args.update_owned, args.migrate_legacy_rewrites)
         ops.private_json(audit / 'plan.json', plan)
         print(json.dumps({'mode': 'apply' if args.apply else 'live-dry-run', 'operation_count': len(plan), 'audit_dir': str(audit)}))
         if args.apply:
             apply_plan(api, plan, audit)
             final = snapshot(api)
             ops.private_json(audit / 'after.json', final)
-            if build_plan(final, args.stage, args.update_owned):
+            if build_plan(final, args.stage, args.update_owned, args.migrate_legacy_rewrites):
                 raise ValueError('Final fresh snapshot is not idempotent; inspect audit')
             print(json.dumps({'verified': True, 'writes': len(plan)}))
         return 0
