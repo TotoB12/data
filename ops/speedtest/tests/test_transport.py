@@ -150,7 +150,7 @@ class TransportTests(unittest.TestCase):
 
     def corpus_receipt(self):
         c = ops.load_contract()
-        return {'bucket': c['bucket'], 'total_bytes': c['total_fixture_bytes'], 'count': 7,
+        return {'bucket': c['bucket'], 'total_bytes': c['total_fixture_bytes'], 'count': len(c['sizes']),
                 'method': 'Offline test receipt: not a real Cloudflare validation',
                 'objects': [{'key': f'speedtest/{n}.bin', 'bytes': n,
                              'sha256': hashlib.sha256(b'').hexdigest() if n == 0 else 'a' * 64,
@@ -162,8 +162,8 @@ class TransportTests(unittest.TestCase):
             path = Path(d) / 'r2-corpus-manifest.json'
             path.write_text(json.dumps(self.corpus_receipt()))
             manifest = ops.validate_corpus_manifest(path)
-            self.assertEqual(len(manifest['objects']), 7)
-            self.assertEqual(manifest['total_bytes'], 386100000)
+            self.assertEqual(len(manifest['objects']), len(ops.SIZES))
+            self.assertEqual(manifest['total_bytes'], sum(ops.SIZES))
 
     def test_operator_corpus_receipt_rejects_wrong_bucket_length_or_metadata(self):
         for change in ('bucket', 'length', 'encoding', 'cache', 'hash'):

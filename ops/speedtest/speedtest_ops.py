@@ -10,7 +10,9 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-SIZES = [0, 100000, 1000000, 10000000, 25000000, 100000000, 250000000]
+LEGACY_SIZES = [0, 100000, 1000000, 10000000, 25000000, 100000000, 250000000]
+CLIENT_SIZES = [n * 1024 ** 2 for n in range(8, 97, 8)] + [100 * 1024 ** 2]
+SIZES = sorted(set(LEGACY_SIZES + CLIENT_SIZES))
 OWNED_PREFIX = 'bella_speedtest_'
 
 
@@ -20,9 +22,12 @@ def load_contract():
                 'zone_id': 'fe78766bf0bcad4c3858ae957b0d4041',
                 'bucket': 'totob12-speedtest', 'data_host': 'data.totob12.com',
                 'origin_host': 'speed-origin.totob12.com', 'path': '/__down',
-                'sizes': SIZES, 'methods': ['GET', 'HEAD', 'OPTIONS'],
+                'version': 2, 'sizes': SIZES, 'legacy_sizes': LEGACY_SIZES, 'client_sizes': CLIENT_SIZES,
+                'methods': ['GET', 'HEAD', 'OPTIONS'],
                 'queries': [f'bytes={n}' for n in SIZES] + ['during=idle&bytes=0', 'during=download&bytes=0'],
-                'total_fixture_bytes': 386100000, 'max_verification_bytes': 2000000000}
+                'total_fixture_bytes': sum(SIZES), 'max_verification_bytes': 2000000000,
+                'content_type': 'application/octet-stream', 'cache_control': 'no-store, no-transform',
+                'edge_ttl_seconds': 2592000}
     if any(c.get(k) != v for k, v in required.items()):
         raise ValueError('Contract differs from approved resource/byte allowlist')
     return c
@@ -31,7 +36,20 @@ def load_contract():
 def match_download(host, raw_path, raw_query, method, headers=None):
     """Literal model, not CF validation; headers use CF's lowercase Map<Array>."""
     c = load_contract()
-    if host != c['data_host'] or raw_path != c['path'] or method not in c['methods'] or raw_query not in c['queries']:
+    if host != c['data_host'] or raw_path != c['path'] or method not in c['methods']:
+        return None
+    # Do not URL-decode names/values: model the immutable raw args map.
+    args = {}
+    for part in raw_query.split('&'):
+        name, separator, value = part.partition('=')
+        if not separator or name not in {'bytes', 'cb', 'during'} or name in args:
+            return None
+        args[name] = value
+    if args.get('bytes') not in {str(n) for n in c['sizes']}:
+        return None
+    if 'cb' in args and not 0 < len(args['cb']) <= 128:
+        return None
+    if 'during' in args and (args['bytes'] != '0' or args['during'] not in {'idle', 'download'}):
         return None
     if method == 'OPTIONS':
         headers = headers or {}
@@ -40,14 +58,14 @@ def match_download(host, raw_path, raw_query, method, headers=None):
         if (len(origins) != 1 or not origins[0] or len(requested) != 1
                 or requested[0] not in ('GET', 'HEAD')):
             return None
-    return int(raw_query.rsplit('bytes=', 1)[1])
+    return int(args['bytes'])
 
 
 def literals(values):
     return '{' + ' '.join(json.dumps(v) for v in values) + '}'
 
 
-def data_scope(c, queries=None, methods=None):
+def data_scope(c, methods=None):
     if methods is None:
         # Missing values compare ne "" as true in the Rules language. Require
         # singleton arrays before checking values; duplicate headers fail closed.
@@ -59,9 +77,46 @@ def data_scope(c, queries=None, methods=None):
                 'and http.request.headers["access-control-request-method"][0] in {"GET" "HEAD"}))')
     else:
         gate = f'http.request.method in {literals(methods)}'
+    # Missing arrays produce missing values, not an empty array. The ge 0
+    # existence check is false for missing values; negating it allows absence.
+    args = 'raw.http.request.uri.args'
+    query_gate = (f'(len({args}["bytes"]) eq 1 '
+                  f'and {args}["bytes"][0] in {literals([str(n) for n in c["sizes"]])} '
+                  f'and all({args}.names[*] in {{"bytes" "cb" "during"}}) '
+                  f'and (not (len({args}["cb"]) ge 0) or '
+                  f'(len({args}["cb"]) eq 1 and len({args}["cb"][0]) gt 0 '
+                  f'and len({args}["cb"][0]) le 128)) '
+                  f'and (not (len({args}["during"]) ge 0) or '
+                  f'(len({args}["during"]) eq 1 and {args}["bytes"][0] eq "0" '
+                  f'and {args}["during"][0] in {{"idle" "download"}})))')
     return (f'(http.host eq "{c["data_host"]}" and raw.http.request.uri.path eq "{c["path"]}" '
-            f'and raw.http.request.uri.query in {literals(c["queries"] if queries is None else queries)} '
-            f'and {gate})')
+            f'and {query_gate} and {gate})')
+
+
+def legacy_rewrite_rules():
+    """Frozen version-1 approved rewrites, solely for exact migration proof.
+
+    Deliberately independent of version-2 data_scope: no expanded query matching.
+    """
+    c = load_contract()
+    gate = ('(http.request.method in {"GET" "HEAD"} or '
+            '(http.request.method eq "OPTIONS" '
+            'and len(http.request.headers["origin"]) eq 1 '
+            'and len(http.request.headers["origin"][0]) gt 0 '
+            'and len(http.request.headers["access-control-request-method"]) eq 1 '
+            'and http.request.headers["access-control-request-method"][0] in {"GET" "HEAD"}))')
+    rules = []
+    for n in LEGACY_SIZES:
+        queries = [f'bytes={n}']
+        if n == 0:
+            queries += ['during=idle&bytes=0', 'during=download&bytes=0']
+        ref = OWNED_PREFIX + f'rewrite_{n}'
+        expression = (f'(http.host eq "{c["data_host"]}" and raw.http.request.uri.path eq "{c["path"]}" '
+                      f'and raw.http.request.uri.query in {literals(queries)} and {gate})')
+        rules.append({'ref': ref, 'description': ref, 'enabled': True, 'action': 'rewrite',
+                      'expression': expression, 'action_parameters': {'uri': {
+                          'path': {'value': f'/speedtest/{n}.bin'}, 'query': {'value': ''}}}})
+    return rules
 
 
 def origin_scope(c):
@@ -78,13 +133,9 @@ def render_rules():
         return {'ref': OWNED_PREFIX + ref, 'description': OWNED_PREFIX + ref,
                 'enabled': True, 'action': action, 'expression': expression,
                 'action_parameters': parameters}
-    rewrite = []
-    for n in c['sizes']:
-        queries = [f'bytes={n}']
-        if n == 0:
-            queries += c['queries'][-2:]
-        rewrite.append(rule(f'rewrite_{n}', 'rewrite', data_scope(c, queries=queries),
-                            {'uri': {'path': {'value': f'/speedtest/{n}.bin'}, 'query': {'value': ''}}}))
+    rewrite = [rule('rewrite', 'rewrite', data_scope(c), {'uri': {
+        'path': {'expression': 'concat("/speedtest/", http.request.uri.args["bytes"][0], ".bin")'},
+        'query': {'value': ''}}})]
     headers = {name: {'operation': 'set', 'value': value} for name, value in {
         'cache-control': c['cache_control'], 'access-control-allow-origin': '*',
         'timing-allow-origin': '*', 'access-control-expose-headers': ', '.join(c['expose_headers'])}.items()}
@@ -172,16 +223,16 @@ def validate_manifest(directory, sizes=None, verify_files=True):
 def validate_corpus_manifest(path):
     """Validate an operator's known-hash/HeadObject receipt, NOT remote bodies.
 
-    Unlike generated manifests, no local copies of all seven objects are assumed.
+    Unlike generated manifests, no local copies of the known objects are assumed.
     This permits verification of a conditionally copied existing corpus without
     regenerating/re-uploading it or mistaking multipart ETags for body SHA-256.
     """
     path = external_path(path)
     c = load_contract()
     m = json.loads(path.read_text())
-    if (m.get('bucket') != c['bucket'] or m.get('count') != 7
+    if (m.get('bucket') != c['bucket'] or m.get('count') != len(c['sizes'])
             or m.get('total_bytes') != c['total_fixture_bytes']
-            or len(m.get('objects', [])) != 7 or not isinstance(m.get('method'), str)):
+            or len(m.get('objects', [])) != len(c['sizes']) or not isinstance(m.get('method'), str)):
         raise ValueError('Invalid operator corpus receipt bucket/count/totals/provenance')
     for n, entry in zip(c['sizes'], m['objects']):
         digest = entry.get('sha256', '')
